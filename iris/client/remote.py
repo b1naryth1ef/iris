@@ -1,8 +1,10 @@
-import time, thread
+import time, thread, logging
 
 from data.base_pb2 import *
 from client.identity import Identity
 from common.util import packet_from_id, packet_to_id, generate_random_number
+
+log = logging.getLogger(__name__)
 
 class RemoteClient(object):
     def __init__(self, parent, socket):
@@ -30,12 +32,7 @@ class RemoteClient(object):
 
     def update(self):
         packet = self.recv()
-
-        if isinstance(packet, PacketClose):
-            print "Remote end is closing our connection ({})".format(packet.reason or 'no reason')
-            self.close()
-        elif isinstance(packet, PacketBeginHandshake):
-            print 'got handshake packet!'
+        self.handle(packet)
 
     @property
     def fileno(self):
@@ -52,7 +49,8 @@ class RemoteClient(object):
         obj.type = packet_to_id(packet)
         obj.data = data
 
-        print 'sending: {} ({})'.format(obj.type, 'encrypted' if encrypt else '')
+        log.debug("Sending packet %s to remote %s (%s)",
+                packet.__class__.__name__, self.identity, 'encrypted' if encrypt else '')
         self.socket.send(obj.SerializeToString())
 
     def recv(self):
@@ -70,10 +68,10 @@ class RemoteClient(object):
 
         packet = packet_from_id(outer.type)()
         packet.ParseFromString(data)
-        self.handle(packet)
+        return packet
 
     def close(self, reason=None):
-        print 'Disconnecting client: %s' % (reason or 'no reason')
+        log.warning("Disconnecting remote client %s (%s)", self.identity, reason or 'no reason')
         if reason:
             obj = PacketClose()
             obj.reason = reason
@@ -81,7 +79,7 @@ class RemoteClient(object):
         self.socket.close()
 
     def handle(self, packet):
-        print 'Got packet {}'.format(packet.__class__.__name__)
+        log.debug("Recieved packet %s", packet.__class__.__name__)
         if isinstance(packet, PacketBeginHandshake):
             self.handle_begin_handshake(packet)
         elif isinstance(packet, PacketDenyHandshake):
@@ -90,6 +88,8 @@ class RemoteClient(object):
             self.handle_accept_handshake(packet)
         elif isinstance(packet, PacketCompleteHandshake):
             self.handle_complete_handshake(packet)
+        else:
+            log.warning("Failed to handle packet %s", packet.__class__.__name__)
 
     def handle_begin_handshake(self, packet):
         # We do not allow re-negoationing or a new handshake
@@ -116,7 +116,7 @@ class RemoteClient(object):
         self.send(resp, False)
 
     def handle_deny_handshake(self, packet):
-        print "got deny handshake"
+        pass
         # TODO: this
 
     def handle_accept_handshake(self, packet):
@@ -150,5 +150,4 @@ class RemoteClient(object):
             raise Exception("Invalid challenge response for handshake completion")
 
         self.auth_completed = True
-
-        print 'completed 3-way handshake'
+        log.info("Completed 3-way handshake with %s", self.identity)

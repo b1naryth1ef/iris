@@ -8,6 +8,7 @@ parser.add_argument('seeds', metavar='SEEDS', nargs='+')
 args = vars(parser.parse_args())
 
 def main():
+    import common.log
     from client.local import LocalClient
     from client.identity import Identity
 

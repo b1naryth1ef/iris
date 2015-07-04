@@ -1,25 +1,9 @@
-import time, thread
+import time, thread, logging
 
 from client.remote import RemoteClient
 from network.connection import Protocol, ProtocolUpdateEvent
 
-"""
-udp = UDPProtocol(9090)
-udp.listen()
-
-for update in udp.poll():
-    # If we're a new connection
-    if update.type == Updates.NEW_CONNECTION:
-        self.add_connection(Connection(update.socket))
-
-    if update.type == Updates.NEW_MESSAGE:
-        conn = self.get_connection(update.socket)
-        conn.read()
-
-    if update.type == Updates.CLOSE_CONNECTION:
-        conn = self.get_connection(update.socket)
-        conn.close()
-"""
+log = logging.getLogger(__name__)
 
 class LocalClient(object):
     def __init__(self, identity, port, seeds=None):
@@ -33,12 +17,14 @@ class LocalClient(object):
         self.clients = {}
 
     def run(self):
+        log.info("Starting LocalClient up...")
         thread.start_new_thread(self.network_loop, ())
 
+        log.info("Attempting to seed mesh from %s seeds", len(self.seeds))
         for conns in self.seeds:
             socket = self.server.connect(conns)
             if not socket:
-                print 'failed to seed from %s' % conns
+                log.error("Failed to seed from %s", conns)
                 continue
             client = self.clients[socket.fileno()] = RemoteClient(self, socket)
             client.send_handshake()
