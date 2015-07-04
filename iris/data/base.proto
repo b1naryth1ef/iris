@@ -4,9 +4,10 @@ enum PacketType {
   BeginHandshake = 1;
   DenyHandshake = 2;
   AcceptHandshake = 3;
-  Ping = 4;
-  Pong = 5;
-  Close = 6;
+  CompleteHandshake = 4;
+  Ping = 5;
+  Pong = 6;
+  Close = 7;
 }
 
 message Packet {
@@ -30,6 +31,11 @@ message PacketAcceptHandshake {
   required string id = 1;
   required bytes pubkey = 2;
   required bytes response = 3;
+  required uint32 challenge = 4;
+}
+
+message PacketCompleteHandshake {
+  required bytes response = 1; 
 }
 
 message PacketPing {

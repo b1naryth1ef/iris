@@ -49,7 +49,6 @@ class Protocol(object):
                     yield ProtocolUpdateEvent(conn, ProtocolUpdateEvent.NEW)
                 else:
                     if event & select.EPOLLIN:
-                        self.epoll.modify(fno, 0)
                         yield ProtocolUpdateEvent(fno, ProtocolUpdateEvent.DATA)
 
                     if event & select.EPOLLHUP:

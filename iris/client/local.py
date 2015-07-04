@@ -22,7 +22,8 @@ for update in udp.poll():
 """
 
 class LocalClient(object):
-    def __init__(self, port, seeds=None):
+    def __init__(self, identity, port, seeds=None):
+        self.identity = identity
         self.port = port
         self.seeds = seeds
 
@@ -40,7 +41,7 @@ class LocalClient(object):
                 print 'failed to seed from %s' % conns
                 continue
             client = self.clients[socket.fileno()] = RemoteClient(self, socket)
-            client.handshake()
+            client.send_handshake()
 
         while True:
             time.sleep(1)

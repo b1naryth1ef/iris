@@ -14,7 +14,7 @@ from google.protobuf import descriptor_pb2
 DESCRIPTOR = _descriptor.FileDescriptor(
   name='base.proto',
   package='',
-  serialized_pb='\n\nbase.proto\"1\n\x06Packet\x12\x19\n\x04type\x18\x01 \x02(\x0e\x32\x0b.PacketType\x12\x0c\n\x04\x64\x61ta\x18\x02 \x02(\x0c\"X\n\x14PacketBeginHandshake\x12\n\n\x02id\x18\x01 \x02(\t\x12\x0e\n\x06pubkey\x18\x02 \x02(\x0c\x12\x11\n\ttimestamp\x18\x03 \x02(\r\x12\x11\n\tchallenge\x18\x04 \x02(\r\"6\n\x13PacketDenyHandshake\x12\x0e\n\x06reason\x18\x01 \x02(\t\x12\x0f\n\x07\x62\x61\x63koff\x18\x02 \x02(\r\"E\n\x15PacketAcceptHandshake\x12\n\n\x02id\x18\x01 \x02(\t\x12\x0e\n\x06pubkey\x18\x02 \x02(\x0c\x12\x10\n\x08response\x18\x03 \x02(\x0c\"2\n\nPacketPing\x12\x11\n\ttimestamp\x18\x01 \x02(\r\x12\x11\n\tchallenge\x18\x02 \x02(\r\"1\n\nPacketPong\x12\x11\n\ttimestamp\x18\x01 \x02(\r\x12\x10\n\x08response\x18\x02 \x02(\x0c\"\x1d\n\x0bPacketClose\x12\x0e\n\x06reason\x18\x01 \x01(\t*t\n\nPacketType\x12\x0b\n\x07Invalid\x10\x00\x12\x12\n\x0e\x42\x65ginHandshake\x10\x01\x12\x11\n\rDenyHandshake\x10\x02\x12\x13\n\x0f\x41\x63\x63\x65ptHandshake\x10\x03\x12\x08\n\x04Ping\x10\x04\x12\x08\n\x04Pong\x10\x05\x12\t\n\x05\x43lose\x10\x06')
+  serialized_pb='\n\nbase.proto\"1\n\x06Packet\x12\x19\n\x04type\x18\x01 \x02(\x0e\x32\x0b.PacketType\x12\x0c\n\x04\x64\x61ta\x18\x02 \x02(\x0c\"X\n\x14PacketBeginHandshake\x12\n\n\x02id\x18\x01 \x02(\t\x12\x0e\n\x06pubkey\x18\x02 \x02(\x0c\x12\x11\n\ttimestamp\x18\x03 \x02(\r\x12\x11\n\tchallenge\x18\x04 \x02(\r\"6\n\x13PacketDenyHandshake\x12\x0e\n\x06reason\x18\x01 \x02(\t\x12\x0f\n\x07\x62\x61\x63koff\x18\x02 \x02(\r\"X\n\x15PacketAcceptHandshake\x12\n\n\x02id\x18\x01 \x02(\t\x12\x0e\n\x06pubkey\x18\x02 \x02(\x0c\x12\x10\n\x08response\x18\x03 \x02(\x0c\x12\x11\n\tchallenge\x18\x04 \x02(\r\"+\n\x17PacketCompleteHandshake\x12\x10\n\x08response\x18\x01 \x02(\x0c\"2\n\nPacketPing\x12\x11\n\ttimestamp\x18\x01 \x02(\r\x12\x11\n\tchallenge\x18\x02 \x02(\r\"1\n\nPacketPong\x12\x11\n\ttimestamp\x18\x01 \x02(\r\x12\x10\n\x08response\x18\x02 \x02(\x0c\"\x1d\n\x0bPacketClose\x12\x0e\n\x06reason\x18\x01 \x01(\t*\x8b\x01\n\nPacketType\x12\x0b\n\x07Invalid\x10\x00\x12\x12\n\x0e\x42\x65ginHandshake\x10\x01\x12\x11\n\rDenyHandshake\x10\x02\x12\x13\n\x0f\x41\x63\x63\x65ptHandshake\x10\x03\x12\x15\n\x11\x43ompleteHandshake\x10\x04\x12\x08\n\x04Ping\x10\x05\x12\x08\n\x04Pong\x10\x06\x12\t\n\x05\x43lose\x10\x07')
 
 _PACKETTYPE = _descriptor.EnumDescriptor(
   name='PacketType',
@@ -39,22 +39,26 @@ _PACKETTYPE = _descriptor.EnumDescriptor(
       options=None,
       type=None),
     _descriptor.EnumValueDescriptor(
-      name='Ping', index=4, number=4,
+      name='CompleteHandshake', index=4, number=4,
       options=None,
       type=None),
     _descriptor.EnumValueDescriptor(
-      name='Pong', index=5, number=5,
+      name='Ping', index=5, number=5,
       options=None,
       type=None),
     _descriptor.EnumValueDescriptor(
-      name='Close', index=6, number=6,
+      name='Pong', index=6, number=6,
+      options=None,
+      type=None),
+    _descriptor.EnumValueDescriptor(
+      name='Close', index=7, number=7,
       options=None,
       type=None),
   ],
   containing_type=None,
   options=None,
-  serialized_start=416,
-  serialized_end=532,
+  serialized_start=481,
+  serialized_end=620,
 )
 
 PacketType = enum_type_wrapper.EnumTypeWrapper(_PACKETTYPE)
@@ -62,9 +66,10 @@ Invalid = 0
 BeginHandshake = 1
 DenyHandshake = 2
 AcceptHandshake = 3
-Ping = 4
-Pong = 5
-Close = 6
+CompleteHandshake = 4
+Ping = 5
+Pong = 6
+Close = 7
 
 
 
@@ -215,6 +220,13 @@ _PACKETACCEPTHANDSHAKE = _descriptor.Descriptor(
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       options=None),
+    _descriptor.FieldDescriptor(
+      name='challenge', full_name='PacketAcceptHandshake.challenge', index=3,
+      number=4, type=13, cpp_type=3, label=2,
+      has_default_value=False, default_value=0,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
   ],
   extensions=[
   ],
@@ -225,7 +237,35 @@ _PACKETACCEPTHANDSHAKE = _descriptor.Descriptor(
   is_extendable=False,
   extension_ranges=[],
   serialized_start=211,
-  serialized_end=280,
+  serialized_end=299,
+)
+
+
+_PACKETCOMPLETEHANDSHAKE = _descriptor.Descriptor(
+  name='PacketCompleteHandshake',
+  full_name='PacketCompleteHandshake',
+  filename=None,
+  file=DESCRIPTOR,
+  containing_type=None,
+  fields=[
+    _descriptor.FieldDescriptor(
+      name='response', full_name='PacketCompleteHandshake.response', index=0,
+      number=1, type=12, cpp_type=9, label=2,
+      has_default_value=False, default_value="",
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+  ],
+  extensions=[
+  ],
+  nested_types=[],
+  enum_types=[
+  ],
+  options=None,
+  is_extendable=False,
+  extension_ranges=[],
+  serialized_start=301,
+  serialized_end=344,
 )
 
 
@@ -259,8 +299,8 @@ _PACKETPING = _descriptor.Descriptor(
   options=None,
   is_extendable=False,
   extension_ranges=[],
-  serialized_start=282,
-  serialized_end=332,
+  serialized_start=346,
+  serialized_end=396,
 )
 
 
@@ -294,8 +334,8 @@ _PACKETPONG = _descriptor.Descriptor(
   options=None,
   is_extendable=False,
   extension_ranges=[],
-  serialized_start=334,
-  serialized_end=383,
+  serialized_start=398,
+  serialized_end=447,
 )
 
 
@@ -322,8 +362,8 @@ _PACKETCLOSE = _descriptor.Descriptor(
   options=None,
   is_extendable=False,
   extension_ranges=[],
-  serialized_start=385,
-  serialized_end=414,
+  serialized_start=449,
+  serialized_end=478,
 )
 
 _PACKET.fields_by_name['type'].enum_type = _PACKETTYPE
@@ -331,6 +371,7 @@ DESCRIPTOR.message_types_by_name['Packet'] = _PACKET
 DESCRIPTOR.message_types_by_name['PacketBeginHandshake'] = _PACKETBEGINHANDSHAKE
 DESCRIPTOR.message_types_by_name['PacketDenyHandshake'] = _PACKETDENYHANDSHAKE
 DESCRIPTOR.message_types_by_name['PacketAcceptHandshake'] = _PACKETACCEPTHANDSHAKE
+DESCRIPTOR.message_types_by_name['PacketCompleteHandshake'] = _PACKETCOMPLETEHANDSHAKE
 DESCRIPTOR.message_types_by_name['PacketPing'] = _PACKETPING
 DESCRIPTOR.message_types_by_name['PacketPong'] = _PACKETPONG
 DESCRIPTOR.message_types_by_name['PacketClose'] = _PACKETCLOSE
@@ -358,6 +399,12 @@ class PacketAcceptHandshake(_message.Message):
   DESCRIPTOR = _PACKETACCEPTHANDSHAKE
 
   # @@protoc_insertion_point(class_scope:PacketAcceptHandshake)
+
+class PacketCompleteHandshake(_message.Message):
+  __metaclass__ = _reflection.GeneratedProtocolMessageType
+  DESCRIPTOR = _PACKETCOMPLETEHANDSHAKE
+
+  # @@protoc_insertion_point(class_scope:PacketCompleteHandshake)
 
 class PacketPing(_message.Message):
   __metaclass__ = _reflection.GeneratedProtocolMessageType
