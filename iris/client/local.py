@@ -1,13 +1,17 @@
 import time, thread, logging
 
-from client.remote import RemoteClient
-from network.connection import Protocol, ProtocolUpdateEvent
+from ..data.base_pb2 import *
+from ..common.util import generate_random_number
+from ..db.user import User
+from ..network.connection import Protocol, ProtocolUpdateEvent
+from .remote import RemoteClient
 
 log = logging.getLogger(__name__)
 
 class LocalClient(object):
-    def __init__(self, identity, port, seeds=None):
-        self.identity = identity
+    def __init__(self, user, shards, port, seeds=None):
+        self.user = user
+        self.shards = shards
         self.port = port
         self.seeds = seeds
 
@@ -15,22 +19,29 @@ class LocalClient(object):
         self.server.listen({'port': port})
 
         self.clients = {}
+    
+    def send_handshake(self, remote):
+        packet = PacketBeginHandshake()
+        packet.pubkey = str(self.user.public_key).encode('hex')
+        packet.nickname = self.user.nickname
+        packet.timestamp = int(time.time())
+        packet.challenge = remote.auth_challenge = generate_random_number(8)
+        remote.send(packet)
 
     def run(self):
         log.info("Starting LocalClient up...")
-        thread.start_new_thread(self.network_loop, ())
+        # thread.start_new_thread(self.network_loop, ())
 
-        log.info("Attempting to seed mesh from %s seeds", len(self.seeds))
+        log.info("Attempting to seed from %s seeds", len(self.seeds))
         for conns in self.seeds:
             socket = self.server.connect(conns)
             if not socket:
                 log.error("Failed to seed from %s", conns)
                 continue
             client = self.clients[socket.fileno()] = RemoteClient(self, socket)
-            client.send_handshake()
+            self.send_handshake(client)
 
-        while True:
-            time.sleep(1)
+        self.network_loop()
 
     def network_loop(self):
         for update in self.server.poll():

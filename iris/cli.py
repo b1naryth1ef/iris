@@ -1,0 +1,3 @@
+
+class IrisCLI(object):
+    pass

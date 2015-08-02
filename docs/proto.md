@@ -1,6 +1,11 @@
 # Protocol
 The iris protocol is transport agnostic and uses protobufs. Messages can optionally be encrypted with the recievers public-key.
 
+## Boostrapping process
+- Get peers
+- Ask for mesh base (json payload at the root of the chain)
+- Ask peers for mesh data that we want, generally we sync the entire mesh
+
 ## Protocol Rules
 
 ### R001 - Handshake Packet Ordering
