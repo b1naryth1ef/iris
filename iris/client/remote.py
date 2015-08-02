@@ -11,6 +11,7 @@ class RemoteClient(object):
         self.parent = parent
         self.socket = socket
 
+        self.conn = None
         self.user = None
         self.auth_completed = False
         self.auth_challenge = None
@@ -24,6 +25,7 @@ class RemoteClient(object):
 
     def update(self):
         packet = self.recv()
+        if not packet: return
         self.handle(packet)
 
     @property
@@ -91,6 +93,10 @@ class RemoteClient(object):
                 return self.handle_request_peers(packet)
             elif isinstance(packet, PacketRequestShards):
                 return self.handle_request_shards(packet)
+            elif isinstance(packet, PacketListPeers):
+                return self.handle_list_peers(packet)
+            elif isinstance(packet, PacketListShards):
+                return self.handle_list_shards(packet)
 
         log.warning("Failed to handle packet %s", packet.__class__.__name__)
 
@@ -105,16 +111,14 @@ class RemoteClient(object):
             self.close("R002: timestamp is too skewed to complete handshake")
             raise Exception("R002: timestamp skew to great")
 
-        try:
-            self.user = User.get(User.id == packet.pubkey)
-        except User.DoesNotExist:
-            log.info("Adding newly met user %s to DB", packet.pubkey)
-            self.user = User.create(id=packet.pubkey, public_key=packet.pubkey.decode('hex'), nickname=packet.nickname)
+        self.user = User.from_proto(packet.peer.user)
+        self.conn = (packet.peer.ip, packet.peer.port)
 
         # Construct response
         resp = PacketAcceptHandshake()
-        resp.pubkey = str(self.parent.user.public_key).encode('hex')
-        resp.nickname = self.parent.user.nickname
+        resp.peer.ip = self.parent.ip
+        resp.peer.port = self.parent.port
+        resp.peer.user.CopyFrom(self.parent.user.to_proto())
         resp.response = self.parent.user.encrypt(str(packet.challenge), self.user)
         resp.challenge = self.auth_challenge = generate_random_number(9)
         self.send(resp, False)
@@ -130,14 +134,11 @@ class RemoteClient(object):
             self.close("R001 invalid handshake packet")
             raise Exception("R001: unexpected PacketAcceptHandshake packet")
 
-        try:
-            self.user = User.get(User.id == packet.pubkey)
-        except User.DoesNotExist:
-            log.info("Adding newly met user %s to DB", packet.pubkey)
-            self.user = User.create(id=packet.pubkey, public_key=packet.pubkey.decode('hex'), nickname=packet.nickname)
-
+        self.user = User.from_proto(packet.peer.user)
+        self.conn = (packet.peer.ip, packet.peer.port)
+        
+        # Validate encoded stuff 
         decoded = self.parent.user.decrypt(packet.response, self.user)
-
         if decoded != str(self.auth_challenge):
             self.close("invalid challenge response")
             raise Exception("Invalid challenge response for handshake accept")
@@ -166,13 +167,23 @@ class RemoteClient(object):
         log.info("Completed 3-way handshake with %s", self.user)
 
     def handle_request_peers(self, packet):
-        log.info("Would send %s peers", len(self.parent.clients) - 1)
-        print packet.shards
-
-        peers = map(lambda i: i.socket.getpeername(), self.parent.clients.values())
+        peers = map(lambda i: i.conn, filter(lambda i: i != self and i and i.conn, self.parent.clients.values()))
         peers = peers[:packet.maxsize]
 
+        log.info("Sending %s peers to %s", len(peers), self.user)
         resp = PacketListPeers()
+
+        for client in self.parent.clients.values():
+            # Never send ourself
+            if client == self:
+                continue
+
+            rpeer = IPeer()
+            rpeer.ip, rpeer.port = client.conn
+            rpeer.user.CopyFrom(client.user.to_proto())
+            resp.peers.extend([rpeer])
+
+        self.send(resp)
 
     def handle_request_shards(self, packet):
         if len(packet.shards):
@@ -195,4 +206,19 @@ class RemoteClient(object):
         else:
             # TODO: blah
             pass
+
+    def handle_list_peers(self, packet):
+        log.info("Checking to see if we can peer with any of %s shared peers", len(packet.peers))
+        
+        peered = 0
+        for rpeer in packet.peers:
+            for lpeer in self.parent.clients.values():
+                # If we have that user already, don't add
+                if lpeer.user and lpeer.user.id == rpeer.user.id:
+                    break
+            else:
+                peered += 1
+                self.parent.add_peer('{}:{}'.format(rpeer.ip, rpeer.port))
+        
+        log.debug("Attempted to add %s peers from a shared peer set", peered)
 

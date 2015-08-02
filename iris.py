@@ -18,6 +18,7 @@ daemon_parser = subparsers.add_parser('daemon', help='manage a iris client daemo
 daemon_parser.add_argument('--path', default='~/.iris')
 daemon_parser.add_argument('--port', default=9090, type=int, help='port for the iris client to run on')
 daemon_parser.add_argument('--seed', required=False, help='a comma-seperated value of ip:port combinations to seed from')
+daemon_parser.add_argument('--no-fork', action='store_true', help='do not fork when running the daemon')
 
 # Client mode
 client_parser = subparsers.add_parser('cli', help='manage a remote iris daemon')

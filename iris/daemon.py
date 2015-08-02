@@ -24,7 +24,10 @@ class BaseRPCServer(object):
         }, True
 
     def handle_stop(self, obj):
-        os.kill(self.daemon.pid, SIGTERM), True
+        if self.daemon.pid:
+            os.kill(self.daemon.pid, SIGTERM), True
+        else:
+            sys.exit(0)
        
     def handle_add_shard(self, obj):
         if self.daemon.client.add_shard(obj['id']):
@@ -45,8 +48,11 @@ class IrisSocketRPCServer(BaseRPCServer):
     
     def serve(self):
         while True:
-            conn, addr = self.socket.accept()
-            thread.start_new_thread(self.handle_connection, (conn, addr))
+            try:
+                conn, addr = self.socket.accept()
+                thread.start_new_thread(self.handle_connection, (conn, addr))
+            except Exception as e:
+                print e 
 
     def handle_connection(self, conn, addr):
         while True:
@@ -82,10 +88,12 @@ class IrisSocketRPCServer(BaseRPCServer):
         })
 
 class IrisDaemon(object):
-    def __init__(self, path, port=None, seeds=None):
+    def __init__(self, path, port=None, seeds=None, fork=True):
         self.path = os.path.expanduser(path)
         self.port = port
         self.seeds = seeds
+        self.fork = fork
+
         self.socket_path = os.path.join(self.path, 'daemon.sock')
         self.pidfile = os.path.join(self.path, 'pid')
         self.pid = None
@@ -122,19 +130,24 @@ class IrisDaemon(object):
                 os.remove(self.pidfile)
 
     def run(self):
-        if os.path.exists(self.pidfile):
-            raise DaemonException("Pid file exists, is another daemon process running?")
+        if self.fork:
+            if os.path.exists(self.pidfile):
+                raise DaemonException("Pid file exists, is another daemon process running?")
 
-        self.pid = os.fork()
-        if self.pid > 0:
-            sys.exit(0)
+            self.pid = os.fork()
+            if self.pid > 0:
+                sys.exit(0)
 
-        with open(self.pidfile, 'w') as f:
-            f.write(str(self.pid))
+            with open(self.pidfile, 'w') as f:
+                f.write(str(self.pid))
        
         self.client.run()
         self.rpc_server = IrisSocketRPCServer(self)
-        self.rpc_server.serve()
+        # self.rpc_server.serve()
+        
+        import time
+        while True:
+            time.sleep(1)
 
     @classmethod
     def create_cli(cls, args):
@@ -169,4 +182,4 @@ class IrisDaemon(object):
 
     @classmethod
     def from_cli(cls, args):
-        return cls(args['path'], args['port'], args['seed'])
+        return cls(args['path'], args['port'], args['seed'], not args['no_fork'])

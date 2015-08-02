@@ -14,10 +14,18 @@ enum PacketType {
   ListShards = 11;
 }
 
+message IUser {
+  required string id = 1;
+  required string pubkey = 2;
+  required string nickname = 3;
+  optional string first_authed = 4;
+  optional string last_authed = 5;
+}
+
 message IPeer {
-  required string pubkey = 1;
-  required string conn = 2;
-  required uint32 first_seen = 3;
+  required string ip = 1;
+  required uint32 port = 2;
+  required IUser user = 3;
 }
 
 message IShard {
@@ -35,8 +43,7 @@ message Packet {
 }
 
 message PacketBeginHandshake {
-  required string pubkey = 1;
-  required string nickname = 2;
+  required IPeer peer = 1;
   required uint32 timestamp = 3;
   required uint32 challenge = 4;
 }
@@ -47,8 +54,7 @@ message PacketDenyHandshake {
 }
 
 message PacketAcceptHandshake {
-  required string pubkey = 1;
-  required string nickname = 2;
+  required IPeer peer = 1;
   required bytes response = 3;
   required uint32 challenge = 4;
 }
