@@ -10,12 +10,23 @@ enum PacketType {
   Close = 7;
   RequestPeers = 8;
   ListPeers = 9;
+  RequestShards = 10;
+  ListShards = 11;
 }
 
-message Peer {
+message IPeer {
   required string pubkey = 1;
   required string conn = 2;
   required uint32 first_seen = 3;
+}
+
+message IShard {
+  required string id = 1;
+  required string name = 2;
+  required string desc = 3;
+  required bool public = 4;
+  required bytes meta = 5;
+  repeated IPeer peers = 6;
 }
 
 message Packet {
@@ -66,6 +77,16 @@ message PacketRequestPeers {
 }
 
 message PacketListPeers {
-  repeated Peer peers = 1;
+  repeated IPeer peers = 1;
+}
+
+message PacketRequestShards {
+  required uint32 maxsize = 1;
+  repeated string shards = 2;
+  optional bool peers = 3;
+}
+
+message PacketListShards {
+  repeated IShard shards = 1;
 }
 

@@ -21,9 +21,10 @@ daemon_parser.add_argument('--seed', required=False, help='a comma-seperated val
 
 # Client mode
 client_parser = subparsers.add_parser('cli', help='manage a remote iris daemon')
+client_parser.add_argument('--path', default='~/.iris')
 client_parser.add_argument('--status', action='store_true')
 client_parser.add_argument('--stop', action='store_true')
-client_parser.add_argument('--add-shard', action='store_true', help='attempt to add a shard from the peers we have')
+client_parser.add_argument('--add-shard', default=None, help='attempt to add a shard from the peers we have')
 
 def main():
     args = vars(parser.parse_args())
@@ -33,7 +34,7 @@ def main():
     elif args['command'] == 'daemon':
         IrisDaemon.from_cli(args)
     elif args['command'] == 'cli':
-        IrisClient.from_cli(args)
+        IrisCLI.from_cli(args)
     else:
         parser.print_help()
         return 1

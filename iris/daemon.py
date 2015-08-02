@@ -21,11 +21,16 @@ class BaseRPCServer(object):
         return {
             "pid": self.daemon.pid,
             "state": self.daemon.state,
-        }
+        }, True
 
     def handle_stop(self, obj):
-        os.kill(self.daemon.pid, SIGTERM)
-        
+        os.kill(self.daemon.pid, SIGTERM), True
+       
+    def handle_add_shard(self, obj):
+        if self.daemon.client.add_shard(obj['id']):
+            return {}, True
+        else:
+            return {}, False
 
 class IrisSocketRPCServer(BaseRPCServer):
     def __init__(self, daemon):
@@ -66,8 +71,15 @@ class IrisSocketRPCServer(BaseRPCServer):
             })
 
         if hasattr(self, 'handle_{}'.format(data['action'])):
-            return json.dumps(getattr(self, 'handle_{}'.format(data['action']))(data))
+            res, suc = getattr(self, 'handle_{}'.format(data['action']))(data)
+            res['success'] = suc
+            return json.dumps(res)
         
+
+        return json.dumps({
+            "error": "Invalid action",
+            "success": False
+        })
 
 class IrisDaemon(object):
     def __init__(self, path, port=None, seeds=None):
@@ -99,7 +111,6 @@ class IrisDaemon(object):
 
         self.shards = map(lambda i: i.id, list(Shard.select()))
         self.client = LocalClient(self.user, self.shards, self.port, seeds=self.seeds)
-        self.client.run()
 
         try:
             self.run()
@@ -121,6 +132,7 @@ class IrisDaemon(object):
         with open(self.pidfile, 'w') as f:
             f.write(str(self.pid))
        
+        self.client.run()
         self.rpc_server = IrisSocketRPCServer(self)
         self.rpc_server.serve()
 

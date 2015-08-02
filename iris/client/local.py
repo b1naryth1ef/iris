@@ -19,7 +19,14 @@ class LocalClient(object):
         self.server.listen({'port': port})
 
         self.clients = {}
-    
+
+    def add_shard(self, id):
+        packet = PacketRequestShards()
+        packet.maxsize = 1
+        packet.shards.append(id)
+        packet.peers = True
+        map(lambda i: i.send(packet), self.clients.values())
+
     def send_handshake(self, remote):
         packet = PacketBeginHandshake()
         packet.pubkey = str(self.user.public_key).encode('hex')
@@ -30,7 +37,7 @@ class LocalClient(object):
 
     def run(self):
         log.info("Starting LocalClient up...")
-        # thread.start_new_thread(self.network_loop, ())
+        thread.start_new_thread(self.network_loop, ())
 
         log.info("Attempting to seed from %s seeds", len(self.seeds))
         for conns in self.seeds:
@@ -40,8 +47,6 @@ class LocalClient(object):
                 continue
             client = self.clients[socket.fileno()] = RemoteClient(self, socket)
             self.send_handshake(client)
-
-        self.network_loop()
 
     def network_loop(self):
         for update in self.server.poll():

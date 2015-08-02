@@ -47,7 +47,7 @@ class RemoteClient(object):
 
     def recv(self):
         data = self.socket.recv(4096)
-        
+
         if not data:
             log.info("Lost connection to remote client %s", self.user)
             return self.close()
@@ -89,6 +89,8 @@ class RemoteClient(object):
         if self.user and self.auth_completed:
             if isinstance(packet, PacketRequestPeers):
                 return self.handle_request_peers(packet)
+            elif isinstance(packet, PacketRequestShards):
+                return self.handle_request_shards(packet)
 
         log.warning("Failed to handle packet %s", packet.__class__.__name__)
 
@@ -133,7 +135,7 @@ class RemoteClient(object):
         except User.DoesNotExist:
             log.info("Adding newly met user %s to DB", packet.pubkey)
             self.user = User.create(id=packet.pubkey, public_key=packet.pubkey.decode('hex'), nickname=packet.nickname)
-        
+
         decoded = self.parent.user.decrypt(packet.response, self.user)
 
         if decoded != str(self.auth_challenge):
@@ -172,4 +174,25 @@ class RemoteClient(object):
 
         resp = PacketListPeers()
 
+    def handle_request_shards(self, packet):
+        if len(packet.shards):
+            matched = [i for i in packet.shards if i in self.parent.shards]
+            resp = PacketListShards()
+
+            for shard in matched:
+                shard = Shard.get(Shard.id == shard)
+                rshard = IShard()
+                rshard.id = shard.id
+                rshard.name = shard.name
+                rshard.desc = shard.name
+                rshard.public = shard.public
+                rshard.meta = shard.meta
+                # TODO: pull peers
+                rshard.peers = []
+                resp.shards.append(rshard)
+
+            self.send(resp)
+        else:
+            # TODO: blah
+            pass
 
