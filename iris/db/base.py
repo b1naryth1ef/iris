@@ -29,17 +29,41 @@ class BaseModel(Model):
                     value = getattr(value, value.__class__._meta.get_primary_key_fields()[0].name)
 
             if field.endswith('_key'):
-                value = value.encode('hex')
+                value = str(value).encode('hex')
 
             obj[field] = value
         
         return to_ordered(obj)
 
+    def get_hash_dict(self):
+        obj = self.to_dict(getattr(self, 'HASH_FIELDS', None), False)
+        if 'id' in obj:
+            del obj['id']
+        return IrisJSONEncoder().encode(obj)
+
     @property
     def hash(self):
-        obj = self.to_dict(getattr(self, 'HASH_FIELDS'), False)
-        del obj['id']
-        return encode_sha256(IrisJSONEncoder().encode(obj))
+        return encode_sha256(self.get_hash_dict())
+
+    @classmethod
+    def from_proto(cls, obj, result):
+        # If the sender lied about the ID, they are trying to be malicious
+        if result.id != result.hash:
+            raise TrustException("Recieved serialized version of %s, with an invalid or spoofed hash (%s vs %s)" %
+                (cls.__name__, result.id, result.hash), TrustException.Level.MALICIOUS)
+
+        try:
+            # Grab an existing version
+            obj = cls.get(cls.id == obj.id)
+
+            # If our hashes don't match, one of us have invalid data
+            if obj.hash != result.hash:
+                raise TrustException("Found existing version of %s, but our hashes do not match (%s vs %s)" %
+                    (cls.__name__, obj.hash, result.hash), TrustException.Level.INACCURATE)
+            return obj
+        except cls.DoesNotExist:
+            result.save(force_insert=True)
+            return result
 
 def create_db(path):
     if os.path.exists(path):

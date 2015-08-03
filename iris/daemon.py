@@ -40,7 +40,7 @@ class IrisSocketRPCServer(BaseRPCServer):
         self.daemon = daemon
 
         if os.path.exists(self.daemon.socket_path):
-            os.unlink(self.daemon.socket_path)
+            os.remove(self.daemon.socket_path)
 
         self.socket = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
         self.socket.bind(self.daemon.socket_path)
@@ -48,11 +48,8 @@ class IrisSocketRPCServer(BaseRPCServer):
     
     def serve(self):
         while True:
-            try:
-                conn, addr = self.socket.accept()
-                thread.start_new_thread(self.handle_connection, (conn, addr))
-            except Exception as e:
-                print e 
+            conn, addr = self.socket.accept()
+            thread.start_new_thread(self.handle_connection, (conn, addr))
 
     def handle_connection(self, conn, addr):
         while True:
@@ -88,7 +85,7 @@ class IrisSocketRPCServer(BaseRPCServer):
         })
 
 class IrisDaemon(object):
-    def __init__(self, path, port=None, seeds=None, fork=True):
+    def __init__(self, path, port=None, seeds=None, fork=True, upnp=False):
         self.path = os.path.expanduser(path)
         self.port = port
         self.seeds = seeds
@@ -102,12 +99,7 @@ class IrisDaemon(object):
             raise DaemonException("Path `{}` does not exist".format(self.path))
 
         init_db(os.path.join(self.path, 'database.db'))
-
-        with open(os.path.join(self.path, 'profile.json')) as f:
-            self.profile = json.load(f)
-
-        self.user = User.get(User.id == self.profile['id'])
-        self.user.secret_key = self.profile['secret_key'].decode('hex')
+        self.load_profile()
 
         if self.seeds:
             self.seeds = filter(bool, self.seeds).split(',')
@@ -117,8 +109,8 @@ class IrisDaemon(object):
         if not len(self.seeds):
             raise DaemonException("Cannot run, we have no seeds!")
 
-        self.shards = map(lambda i: i.id, list(Shard.select()))
-        self.client = LocalClient(self.user, self.shards, self.port, seeds=self.seeds)
+        self.shards = list(Shard.select())
+        self.client = LocalClient(self.user, self.shards, self.port, seeds=self.seeds, upnp=upnp)
 
         try:
             self.run()
@@ -128,6 +120,13 @@ class IrisDaemon(object):
             # print open(self.pidfile, 'r').read().strip(), self.pid
             if os.path.exists(self.pidfile) and str(self.pid) == open(self.pidfile, 'r').read().strip():
                 os.remove(self.pidfile)
+
+    def load_profile(self):
+        with open(os.path.join(self.path, 'profile.json')) as f:
+            self.profile = json.load(f)
+
+        self.user = User.get(User.id == self.profile['id'])
+        self.user.secret_key = self.profile['secret_key'].decode('hex')
 
     def run(self):
         if self.fork:
@@ -143,15 +142,10 @@ class IrisDaemon(object):
        
         self.client.run()
         self.rpc_server = IrisSocketRPCServer(self)
-        # self.rpc_server.serve()
+        self.rpc_server.serve()
         
-        import time
-        while True:
-            time.sleep(1)
-
     @classmethod
-    def create_cli(cls, args):
-        path = os.path.expanduser(args['path'])
+    def create_profile(cls, args, path):
         if os.path.exists(path):
             if not args['overwrite']:
                 raise DaemonException("Path `{}` already exists, cannot create".format(path))
@@ -169,7 +163,7 @@ class IrisDaemon(object):
         log.info("Creating new user")
         user = User()
         user.public_key = ident.public_key
-        user.nickname = args['nickname']
+        user.nickname = raw_input("Nickname? ")
         user.id = user.hash
         user.save(force_insert=True)
         
@@ -181,5 +175,45 @@ class IrisDaemon(object):
         print "Created new profile at {}".format(path)
 
     @classmethod
+    def create_shard(cls, args, path):
+        init_db(os.path.join(path, 'database.db'))
+
+        shard = Shard()
+        shard.name = raw_input("Name? ")
+        shard.desc = raw_input("Desc? ")
+        shard.public = raw_input("Public (Y/n)? ").lower()[0] == 'y'
+        shard.meta = ""
+        shard.id = shard.hash
+        shard.save(force_insert=True)
+
+        print "Created new shard %s" % shard.id
+   
+    @classmethod
+    def create_entry(cls, args, path):
+        init_db(os.path.join(path, 'database.db'))
+
+        with open(os.path.join(path, 'profile.json')) as f:
+            profile = json.load(f)
+
+        user = User.get(User.id == profile['id'])
+        user.secret_key = profile['secret_key'].decode('hex')
+
+        with open(args['path'], 'r') as f:
+            entry = Entry.create_from_json(user, json.load(f))
+
+        print "Created new entry %s" % entry.id
+
+    @classmethod
+    def create_cli(cls, args):
+        path = os.path.expanduser(args['path'])
+
+        if args['type'] == 'profile':
+            return cls.create_profile(args, path)
+        elif args['type'] == 'shard':
+            return cls.create_shard(args, path)
+        elif args['type'] == 'entry':
+            return cls.create_entry(args, path)
+
+    @classmethod
     def from_cli(cls, args):
-        return cls(args['path'], args['port'], args['seed'], not args['no_fork'])
+        return cls(args['path'], args['port'], args['seed'], not args['no_fork'], args['upnp'])

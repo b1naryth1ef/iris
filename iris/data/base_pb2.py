@@ -14,7 +14,7 @@ from google.protobuf import descriptor_pb2
 DESCRIPTOR = _descriptor.FileDescriptor(
   name='base.proto',
   package='',
-  serialized_pb='\n\nbase.proto\"`\n\x05IUser\x12\n\n\x02id\x18\x01 \x02(\t\x12\x0e\n\x06pubkey\x18\x02 \x02(\t\x12\x10\n\x08nickname\x18\x03 \x02(\t\x12\x14\n\x0c\x66irst_authed\x18\x04 \x01(\t\x12\x13\n\x0blast_authed\x18\x05 \x01(\t\"7\n\x05IPeer\x12\n\n\x02ip\x18\x01 \x02(\t\x12\x0c\n\x04port\x18\x02 \x02(\r\x12\x14\n\x04user\x18\x03 \x02(\x0b\x32\x06.IUser\"e\n\x06IShard\x12\n\n\x02id\x18\x01 \x02(\t\x12\x0c\n\x04name\x18\x02 \x02(\t\x12\x0c\n\x04\x64\x65sc\x18\x03 \x02(\t\x12\x0e\n\x06public\x18\x04 \x02(\x08\x12\x0c\n\x04meta\x18\x05 \x02(\x0c\x12\x15\n\x05peers\x18\x06 \x03(\x0b\x32\x06.IPeer\"1\n\x06Packet\x12\x19\n\x04type\x18\x01 \x02(\x0e\x32\x0b.PacketType\x12\x0c\n\x04\x64\x61ta\x18\x02 \x02(\x0c\"R\n\x14PacketBeginHandshake\x12\x14\n\x04peer\x18\x01 \x02(\x0b\x32\x06.IPeer\x12\x11\n\ttimestamp\x18\x03 \x02(\r\x12\x11\n\tchallenge\x18\x04 \x02(\r\"6\n\x13PacketDenyHandshake\x12\x0e\n\x06reason\x18\x01 \x02(\t\x12\x0f\n\x07\x62\x61\x63koff\x18\x02 \x02(\r\"R\n\x15PacketAcceptHandshake\x12\x14\n\x04peer\x18\x01 \x02(\x0b\x32\x06.IPeer\x12\x10\n\x08response\x18\x03 \x02(\x0c\x12\x11\n\tchallenge\x18\x04 \x02(\r\"+\n\x17PacketCompleteHandshake\x12\x10\n\x08response\x18\x01 \x02(\x0c\"2\n\nPacketPing\x12\x11\n\ttimestamp\x18\x01 \x02(\r\x12\x11\n\tchallenge\x18\x02 \x02(\r\"1\n\nPacketPong\x12\x11\n\ttimestamp\x18\x01 \x02(\r\x12\x10\n\x08response\x18\x02 \x02(\x0c\"\x1d\n\x0bPacketClose\x12\x0e\n\x06reason\x18\x01 \x01(\t\"5\n\x12PacketRequestPeers\x12\x0f\n\x07maxsize\x18\x01 \x02(\r\x12\x0e\n\x06shards\x18\x02 \x03(\t\"(\n\x0fPacketListPeers\x12\x15\n\x05peers\x18\x01 \x03(\x0b\x32\x06.IPeer\"E\n\x13PacketRequestShards\x12\x0f\n\x07maxsize\x18\x01 \x02(\r\x12\x0e\n\x06shards\x18\x02 \x03(\t\x12\r\n\x05peers\x18\x03 \x01(\x08\"+\n\x10PacketListShards\x12\x17\n\x06shards\x18\x01 \x03(\x0b\x32\x07.IShard*\xcf\x01\n\nPacketType\x12\x0b\n\x07Invalid\x10\x00\x12\x12\n\x0e\x42\x65ginHandshake\x10\x01\x12\x11\n\rDenyHandshake\x10\x02\x12\x13\n\x0f\x41\x63\x63\x65ptHandshake\x10\x03\x12\x15\n\x11\x43ompleteHandshake\x10\x04\x12\x08\n\x04Ping\x10\x05\x12\x08\n\x04Pong\x10\x06\x12\t\n\x05\x43lose\x10\x07\x12\x10\n\x0cRequestPeers\x10\x08\x12\r\n\tListPeers\x10\t\x12\x11\n\rRequestShards\x10\n\x12\x0e\n\nListShards\x10\x0b')
+  serialized_pb='\n\nbase.proto\"`\n\x05IUser\x12\n\n\x02id\x18\x01 \x02(\t\x12\x0e\n\x06pubkey\x18\x02 \x02(\t\x12\x10\n\x08nickname\x18\x03 \x02(\t\x12\x14\n\x0c\x66irst_authed\x18\x04 \x01(\t\x12\x13\n\x0blast_authed\x18\x05 \x01(\t\"7\n\x05IPeer\x12\n\n\x02ip\x18\x01 \x02(\t\x12\x0c\n\x04port\x18\x02 \x02(\r\x12\x14\n\x04user\x18\x03 \x02(\x0b\x32\x06.IUser\"r\n\x06IShard\x12\n\n\x02id\x18\x01 \x02(\t\x12\x0b\n\x03uid\x18\x02 \x02(\t\x12\x0c\n\x04name\x18\x03 \x02(\t\x12\x0c\n\x04\x64\x65sc\x18\x04 \x02(\t\x12\x0e\n\x06public\x18\x05 \x02(\x08\x12\x0c\n\x04meta\x18\x06 \x02(\x0c\x12\x15\n\x05peers\x18\x07 \x03(\x0b\x32\x06.IPeer\"A\n\x06Packet\x12\x19\n\x04type\x18\x01 \x02(\x0e\x32\x0b.PacketType\x12\x0c\n\x04\x64\x61ta\x18\x02 \x02(\x0c\x12\x0e\n\x06ticket\x18\x03 \x01(\t\"R\n\x14PacketBeginHandshake\x12\x14\n\x04peer\x18\x01 \x02(\x0b\x32\x06.IPeer\x12\x11\n\ttimestamp\x18\x03 \x02(\r\x12\x11\n\tchallenge\x18\x04 \x02(\r\"6\n\x13PacketDenyHandshake\x12\x0e\n\x06reason\x18\x01 \x02(\t\x12\x0f\n\x07\x62\x61\x63koff\x18\x02 \x02(\r\"R\n\x15PacketAcceptHandshake\x12\x14\n\x04peer\x18\x01 \x02(\x0b\x32\x06.IPeer\x12\x10\n\x08response\x18\x03 \x02(\x0c\x12\x11\n\tchallenge\x18\x04 \x02(\r\"+\n\x17PacketCompleteHandshake\x12\x10\n\x08response\x18\x01 \x02(\x0c\"2\n\nPacketPing\x12\x11\n\ttimestamp\x18\x01 \x02(\r\x12\x11\n\tchallenge\x18\x02 \x02(\r\"1\n\nPacketPong\x12\x11\n\ttimestamp\x18\x01 \x02(\r\x12\x10\n\x08response\x18\x02 \x02(\x0c\"\x1d\n\x0bPacketClose\x12\x0e\n\x06reason\x18\x01 \x01(\t\"5\n\x12PacketRequestPeers\x12\x0f\n\x07maxsize\x18\x01 \x02(\r\x12\x0e\n\x06shards\x18\x02 \x03(\t\"(\n\x0fPacketListPeers\x12\x15\n\x05peers\x18\x01 \x03(\x0b\x32\x06.IPeer\"E\n\x13PacketRequestShards\x12\x0f\n\x07maxsize\x18\x01 \x02(\r\x12\x0e\n\x06shards\x18\x02 \x03(\t\x12\r\n\x05peers\x18\x03 \x01(\x08\"C\n\x10PacketListShards\x12\x17\n\x06shards\x18\x01 \x03(\x0b\x32\x07.IShard\x12\x16\n\x05peers\x18\x02 \x03(\x0b\x32\x07.IShard*\xcf\x01\n\nPacketType\x12\x0b\n\x07Invalid\x10\x00\x12\x12\n\x0e\x42\x65ginHandshake\x10\x01\x12\x11\n\rDenyHandshake\x10\x02\x12\x13\n\x0f\x41\x63\x63\x65ptHandshake\x10\x03\x12\x15\n\x11\x43ompleteHandshake\x10\x04\x12\x08\n\x04Ping\x10\x05\x12\x08\n\x04Pong\x10\x06\x12\t\n\x05\x43lose\x10\x07\x12\x10\n\x0cRequestPeers\x10\x08\x12\r\n\tListPeers\x10\t\x12\x11\n\rRequestShards\x10\n\x12\x0e\n\nListShards\x10\x0b')
 
 _PACKETTYPE = _descriptor.EnumDescriptor(
   name='PacketType',
@@ -73,8 +73,8 @@ _PACKETTYPE = _descriptor.EnumDescriptor(
   ],
   containing_type=None,
   options=None,
-  serialized_start=940,
-  serialized_end=1147,
+  serialized_start=993,
+  serialized_end=1200,
 )
 
 PacketType = enum_type_wrapper.EnumTypeWrapper(_PACKETTYPE)
@@ -206,36 +206,43 @@ _ISHARD = _descriptor.Descriptor(
       is_extension=False, extension_scope=None,
       options=None),
     _descriptor.FieldDescriptor(
-      name='name', full_name='IShard.name', index=1,
+      name='uid', full_name='IShard.uid', index=1,
       number=2, type=9, cpp_type=9, label=2,
       has_default_value=False, default_value=unicode("", "utf-8"),
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       options=None),
     _descriptor.FieldDescriptor(
-      name='desc', full_name='IShard.desc', index=2,
+      name='name', full_name='IShard.name', index=2,
       number=3, type=9, cpp_type=9, label=2,
       has_default_value=False, default_value=unicode("", "utf-8"),
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       options=None),
     _descriptor.FieldDescriptor(
-      name='public', full_name='IShard.public', index=3,
-      number=4, type=8, cpp_type=7, label=2,
+      name='desc', full_name='IShard.desc', index=3,
+      number=4, type=9, cpp_type=9, label=2,
+      has_default_value=False, default_value=unicode("", "utf-8"),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+    _descriptor.FieldDescriptor(
+      name='public', full_name='IShard.public', index=4,
+      number=5, type=8, cpp_type=7, label=2,
       has_default_value=False, default_value=False,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       options=None),
     _descriptor.FieldDescriptor(
-      name='meta', full_name='IShard.meta', index=4,
-      number=5, type=12, cpp_type=9, label=2,
+      name='meta', full_name='IShard.meta', index=5,
+      number=6, type=12, cpp_type=9, label=2,
       has_default_value=False, default_value="",
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       options=None),
     _descriptor.FieldDescriptor(
-      name='peers', full_name='IShard.peers', index=5,
-      number=6, type=11, cpp_type=10, label=3,
+      name='peers', full_name='IShard.peers', index=6,
+      number=7, type=11, cpp_type=10, label=3,
       has_default_value=False, default_value=[],
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
@@ -250,7 +257,7 @@ _ISHARD = _descriptor.Descriptor(
   is_extendable=False,
   extension_ranges=[],
   serialized_start=169,
-  serialized_end=270,
+  serialized_end=283,
 )
 
 
@@ -275,6 +282,13 @@ _PACKET = _descriptor.Descriptor(
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       options=None),
+    _descriptor.FieldDescriptor(
+      name='ticket', full_name='Packet.ticket', index=2,
+      number=3, type=9, cpp_type=9, label=1,
+      has_default_value=False, default_value=unicode("", "utf-8"),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
   ],
   extensions=[
   ],
@@ -284,8 +298,8 @@ _PACKET = _descriptor.Descriptor(
   options=None,
   is_extendable=False,
   extension_ranges=[],
-  serialized_start=272,
-  serialized_end=321,
+  serialized_start=285,
+  serialized_end=350,
 )
 
 
@@ -326,8 +340,8 @@ _PACKETBEGINHANDSHAKE = _descriptor.Descriptor(
   options=None,
   is_extendable=False,
   extension_ranges=[],
-  serialized_start=323,
-  serialized_end=405,
+  serialized_start=352,
+  serialized_end=434,
 )
 
 
@@ -361,8 +375,8 @@ _PACKETDENYHANDSHAKE = _descriptor.Descriptor(
   options=None,
   is_extendable=False,
   extension_ranges=[],
-  serialized_start=407,
-  serialized_end=461,
+  serialized_start=436,
+  serialized_end=490,
 )
 
 
@@ -403,8 +417,8 @@ _PACKETACCEPTHANDSHAKE = _descriptor.Descriptor(
   options=None,
   is_extendable=False,
   extension_ranges=[],
-  serialized_start=463,
-  serialized_end=545,
+  serialized_start=492,
+  serialized_end=574,
 )
 
 
@@ -431,8 +445,8 @@ _PACKETCOMPLETEHANDSHAKE = _descriptor.Descriptor(
   options=None,
   is_extendable=False,
   extension_ranges=[],
-  serialized_start=547,
-  serialized_end=590,
+  serialized_start=576,
+  serialized_end=619,
 )
 
 
@@ -466,8 +480,8 @@ _PACKETPING = _descriptor.Descriptor(
   options=None,
   is_extendable=False,
   extension_ranges=[],
-  serialized_start=592,
-  serialized_end=642,
+  serialized_start=621,
+  serialized_end=671,
 )
 
 
@@ -501,8 +515,8 @@ _PACKETPONG = _descriptor.Descriptor(
   options=None,
   is_extendable=False,
   extension_ranges=[],
-  serialized_start=644,
-  serialized_end=693,
+  serialized_start=673,
+  serialized_end=722,
 )
 
 
@@ -529,8 +543,8 @@ _PACKETCLOSE = _descriptor.Descriptor(
   options=None,
   is_extendable=False,
   extension_ranges=[],
-  serialized_start=695,
-  serialized_end=724,
+  serialized_start=724,
+  serialized_end=753,
 )
 
 
@@ -564,8 +578,8 @@ _PACKETREQUESTPEERS = _descriptor.Descriptor(
   options=None,
   is_extendable=False,
   extension_ranges=[],
-  serialized_start=726,
-  serialized_end=779,
+  serialized_start=755,
+  serialized_end=808,
 )
 
 
@@ -592,8 +606,8 @@ _PACKETLISTPEERS = _descriptor.Descriptor(
   options=None,
   is_extendable=False,
   extension_ranges=[],
-  serialized_start=781,
-  serialized_end=821,
+  serialized_start=810,
+  serialized_end=850,
 )
 
 
@@ -634,8 +648,8 @@ _PACKETREQUESTSHARDS = _descriptor.Descriptor(
   options=None,
   is_extendable=False,
   extension_ranges=[],
-  serialized_start=823,
-  serialized_end=892,
+  serialized_start=852,
+  serialized_end=921,
 )
 
 
@@ -653,6 +667,13 @@ _PACKETLISTSHARDS = _descriptor.Descriptor(
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       options=None),
+    _descriptor.FieldDescriptor(
+      name='peers', full_name='PacketListShards.peers', index=1,
+      number=2, type=11, cpp_type=10, label=3,
+      has_default_value=False, default_value=[],
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
   ],
   extensions=[
   ],
@@ -662,8 +683,8 @@ _PACKETLISTSHARDS = _descriptor.Descriptor(
   options=None,
   is_extendable=False,
   extension_ranges=[],
-  serialized_start=894,
-  serialized_end=937,
+  serialized_start=923,
+  serialized_end=990,
 )
 
 _IPEER.fields_by_name['user'].message_type = _IUSER
@@ -673,6 +694,7 @@ _PACKETBEGINHANDSHAKE.fields_by_name['peer'].message_type = _IPEER
 _PACKETACCEPTHANDSHAKE.fields_by_name['peer'].message_type = _IPEER
 _PACKETLISTPEERS.fields_by_name['peers'].message_type = _IPEER
 _PACKETLISTSHARDS.fields_by_name['shards'].message_type = _ISHARD
+_PACKETLISTSHARDS.fields_by_name['peers'].message_type = _ISHARD
 DESCRIPTOR.message_types_by_name['IUser'] = _IUSER
 DESCRIPTOR.message_types_by_name['IPeer'] = _IPEER
 DESCRIPTOR.message_types_by_name['IShard'] = _ISHARD

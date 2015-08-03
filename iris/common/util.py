@@ -1,4 +1,4 @@
-import random, uuid, json, hashlib, datetime
+import random, uuid, json, hashlib, datetime, thread
 
 from collections import OrderedDict
 from ..data.base_pb2 import *
@@ -38,4 +38,10 @@ def packet_to_id(obj):
         raise Exception("Unknown packet type: {}".format(name))
 
     return dict(PacketType.items())[name]
+
+def delayed(f, delay, *args, **kwargs):
+    def _f():
+        time.sleep(delay)
+        f(*args, **kwargs)
+    thread.start_new_thread(_f , ())
 

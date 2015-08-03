@@ -1,0 +1,9 @@
+{
+  "shard": "09c309cb8ec81a53ad9e6e7518834f8c4e9bcef1300ecca0d7f89d66fa95635e",
+  "payload": {
+    "type": "arke.base.post.text",
+    "title": "This is an example iris entry",
+    "body": "This is an example of an iris entry which can be parsed by the (to be written someday) arke.",
+    "tags": ["arke", "iris", "test"]
+  }
+}

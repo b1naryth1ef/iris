@@ -35,15 +35,9 @@ class User(BaseModel, IdentityMixin):
 
     @classmethod
     def from_proto(cls, obj):
-        try:
-            return cls.get(cls.id == obj.id)
-        except cls.DoesNotExist:
-            result = cls.create(
-                id=obj.id,
-                public_key=obj.pubkey.decode('hex'),
-                nickname=obj.nickname)
+        return super(User, cls).from_proto(obj, cls(
+            id=obj.id,
+            public_key=obj.pubkey.decode('hex'),
+            nickname=obj.nickname))
 
-            if result.id != result.hash:
-                raise Exception("Could not create user from proto, ID does not match checked hash!")
-            return result
 

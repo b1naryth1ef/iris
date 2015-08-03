@@ -12,6 +12,25 @@ enum PacketType {
   ListPeers = 9;
   RequestShards = 10;
   ListShards = 11;
+  RequestSyncShard = 12;
+  RequestEntries = 13;
+  ListEntries = 14;
+}
+
+message IStamp {
+  required string entry = 1;
+  required string notary = 2;
+  required string parent = 3;
+  required bytes data = 4;
+}
+
+message IEntry {
+  required string id = 1;
+  required string shard = 2;
+  required string author = 3;
+  required bytes payload = 4;
+  required string created = 5;
+  repeated IStamp stamps = 6; 
 }
 
 message IUser {
@@ -30,16 +49,18 @@ message IPeer {
 
 message IShard {
   required string id = 1;
-  required string name = 2;
-  required string desc = 3;
-  required bool public = 4;
-  required bytes meta = 5;
-  repeated IPeer peers = 6;
+  required string uid = 2;
+  required string name = 3;
+  required string desc = 4;
+  required bool public = 5;
+  required bytes meta = 6;
+  repeated IPeer peers = 7;
 }
 
 message Packet {
   required PacketType type = 1;
   required bytes data = 2;
+  optional string ticket = 3;
 }
 
 message PacketBeginHandshake {
@@ -94,5 +115,22 @@ message PacketRequestShards {
 
 message PacketListShards {
   repeated IShard shards = 1;
+  repeated IShard peers = 2;
 }
+
+message PacketRequestSyncShard {
+  required string id = 1;
+  optional string query = 2;
+}
+
+message PacketRequestEntries {
+  repeated string ids = 1;
+  required uint32 maxsize = 2;
+  optional bool brief = 3;
+}
+
+message PacketListEntries {
+  repeated IPayload payloads = 1;
+}
+
 

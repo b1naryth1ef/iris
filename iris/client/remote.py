@@ -3,6 +3,9 @@ import time, thread, logging
 from ..data.base_pb2 import *
 from ..common.util import packet_from_id, packet_to_id, generate_random_number
 from ..db.user import User
+from ..db.shard import Shard
+
+from .packet import PacketWrapper
 
 log = logging.getLogger(__name__)
 
@@ -24,15 +27,25 @@ class RemoteClient(object):
         thread.start_new_thread(_f, ())
 
     def update(self):
-        packet = self.recv()
-        if not packet: return
-        self.handle(packet)
+        inner, outer = self.recv()
+        if not inner or not outer:
+            return
+       
+        packet = PacketWrapper(self, inner, outer)
 
+        if outer.ticket:
+            self.parent.on_ticket_triggered_pre(outer.ticket, self, packet)
+
+        self.handle(packet)
+        
+        if outer.ticket:
+            self.parent.on_ticket_triggered_post(outer.ticket, self, packet)
+        
     @property
     def fileno(self):
         return self.socket.fileno()
 
-    def send(self, packet, encrypt=True):
+    def send(self, packet, ticket=None, encrypt=True, to=None):
         encrypt = encrypt and self.user
         data = packet.SerializeToString()
 
@@ -43,6 +56,12 @@ class RemoteClient(object):
         obj.type = packet_to_id(packet)
         obj.data = data
 
+        if ticket:
+            if isinstance(ticket, str) or isinstance(ticket, unicode):
+                obj.ticket = ticket
+            else:
+                obj.ticket = ticket.id
+
         log.debug("Sending packet %s to remote %s (%s)",
                 packet.__class__.__name__, self.user, 'encrypted' if encrypt else '')
         self.socket.send(obj.SerializeToString())
@@ -52,7 +71,8 @@ class RemoteClient(object):
 
         if not data:
             log.info("Lost connection to remote client %s", self.user)
-            return self.close()
+            self.close()
+            return None, None
 
         outer = Packet()
         outer.ParseFromString(data)
@@ -67,7 +87,8 @@ class RemoteClient(object):
 
         packet = packet_from_id(outer.type)()
         packet.ParseFromString(data)
-        return packet
+
+        return packet, outer
 
     def close(self, reason=None):
         log.warning("Disconnecting remote client %s (%s)", self.user, reason or 'no reason')
@@ -79,26 +100,27 @@ class RemoteClient(object):
 
     def handle(self, packet):
         log.debug("Recieved packet %s", packet.__class__.__name__)
-        if isinstance(packet, PacketBeginHandshake):
+        
+        if isinstance(packet.inner, PacketBeginHandshake):
             return self.handle_begin_handshake(packet)
-        elif isinstance(packet, PacketDenyHandshake):
+        elif isinstance(packet.inner, PacketDenyHandshake):
             return self.handle_deny_handshake(packet)
-        elif isinstance(packet, PacketAcceptHandshake):
+        elif isinstance(packet.inner, PacketAcceptHandshake):
             return self.handle_accept_handshake(packet)
-        elif isinstance(packet, PacketCompleteHandshake):
+        elif isinstance(packet.inner, PacketCompleteHandshake):
             return self.handle_complete_handshake(packet)
 
         if self.user and self.auth_completed:
-            if isinstance(packet, PacketRequestPeers):
+            if isinstance(packet.inner, PacketRequestPeers):
                 return self.handle_request_peers(packet)
-            elif isinstance(packet, PacketRequestShards):
+            elif isinstance(packet.inner, PacketRequestShards):
                 return self.handle_request_shards(packet)
-            elif isinstance(packet, PacketListPeers):
+            elif isinstance(packet.inner, PacketListPeers):
                 return self.handle_list_peers(packet)
-            elif isinstance(packet, PacketListShards):
+            elif isinstance(packet.inner, PacketListShards):
                 return self.handle_list_shards(packet)
 
-        log.warning("Failed to handle packet %s", packet.__class__.__name__)
+        log.warning("Failed to handle packet %s", packet.inner.__class__.__name__)
 
     def handle_begin_handshake(self, packet):
         # We do not allow re-negoationing or a new handshake
@@ -121,7 +143,7 @@ class RemoteClient(object):
         resp.peer.user.CopyFrom(self.parent.user.to_proto())
         resp.response = self.parent.user.encrypt(str(packet.challenge), self.user)
         resp.challenge = self.auth_challenge = generate_random_number(9)
-        self.send(resp, False)
+        packet.respond(resp, encrypt=False)
 
     def handle_deny_handshake(self, packet):
         pass
@@ -137,7 +159,7 @@ class RemoteClient(object):
         self.user = User.from_proto(packet.peer.user)
         self.conn = (packet.peer.ip, packet.peer.port)
         
-        # Validate encoded stuff 
+        # Validate encoded stuff
         decoded = self.parent.user.decrypt(packet.response, self.user)
         if decoded != str(self.auth_challenge):
             self.close("invalid challenge response")
@@ -148,7 +170,7 @@ class RemoteClient(object):
         # Now lets complete the three-way-shake
         resp = PacketCompleteHandshake()
         resp.response = self.parent.user.encrypt(str(packet.challenge), self.user)
-        self.send(resp, False)
+        packet.respond(resp, encrypt=False)
 
         # Finally request a list of peers
         self.send(PacketRequestPeers(maxsize=128, shards=self.parent.shards))
@@ -183,7 +205,7 @@ class RemoteClient(object):
             rpeer.user.CopyFrom(client.user.to_proto())
             resp.peers.extend([rpeer])
 
-        self.send(resp)
+        packet.respond(resp)
 
     def handle_request_shards(self, packet):
         if len(packet.shards):
@@ -191,21 +213,10 @@ class RemoteClient(object):
             resp = PacketListShards()
 
             for shard in matched:
-                shard = Shard.get(Shard.id == shard)
-                rshard = IShard()
-                rshard.id = shard.id
-                rshard.name = shard.name
-                rshard.desc = shard.name
-                rshard.public = shard.public
-                rshard.meta = shard.meta
-                # TODO: pull peers
-                rshard.peers = []
-                resp.shards.append(rshard)
+                shard = Shard.get(Shard.id == shard).to_proto()
+                resp.shards.extend([shard])
 
-            self.send(resp)
-        else:
-            # TODO: blah
-            pass
+            packet.respond(resp)
 
     def handle_list_peers(self, packet):
         log.info("Checking to see if we can peer with any of %s shared peers", len(packet.peers))
@@ -221,4 +232,13 @@ class RemoteClient(object):
                 self.parent.add_peer('{}:{}'.format(rpeer.ip, rpeer.port))
         
         log.debug("Attempted to add %s peers from a shared peer set", peered)
+
+    def handle_list_shards(self, packet):
+        log.info("Processing a list of shards")
+        for shard in packet.shards:
+            if not Shard.select().where(Shard.id == shard.id).count():
+                log.debug("Adding shard %s", shard.id)
+                Shard.from_proto(shard)
+        
+        map(self.parent.add_peer, map(lambda i: '{}:{}'.format(i.ip, i.port), packet.peers))
 

@@ -8,10 +8,10 @@ parser = argparse.ArgumentParser()
 subparsers = parser.add_subparsers(help='sub-command help', dest='command')
 
 # Create mode
-create_parser = subparsers.add_parser('create', help='create a new iris profile') 
-create_parser.add_argument('nickname', metavar='NICKNAME')
+create_parser = subparsers.add_parser('create', help='create new iris entites') 
+create_parser.add_argument('type', default='profile')
 create_parser.add_argument('--path', default='~/.iris')
-create_parser.add_argument('--overwrite', action='store_true', help='overwrite an existing directory if it exists')
+create_parser.add_argument('--overwrite', action='store_true', help='overwrite if exists')
 
 # Daemon Mode
 daemon_parser = subparsers.add_parser('daemon', help='manage a iris client daemon process')
@@ -19,6 +19,7 @@ daemon_parser.add_argument('--path', default='~/.iris')
 daemon_parser.add_argument('--port', default=9090, type=int, help='port for the iris client to run on')
 daemon_parser.add_argument('--seed', required=False, help='a comma-seperated value of ip:port combinations to seed from')
 daemon_parser.add_argument('--no-fork', action='store_true', help='do not fork when running the daemon')
+daemon_parser.add_argument('--upnp', action='store_true', help='attempt to port forward using UPnP mapping')
 
 # Client mode
 client_parser = subparsers.add_parser('cli', help='manage a remote iris daemon')
