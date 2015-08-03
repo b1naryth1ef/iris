@@ -8,7 +8,7 @@ from .user import User
 
 log = logging.getLogger(__name__)
 
-class Entry(BaseModel):
+class Entry(BaseModel, SignatureModel('author')):
     HASH_FIELDS = ["shard", "author", "payload", "created"]
 
     shard = ForeignKeyField(Shard)
@@ -16,25 +16,25 @@ class Entry(BaseModel):
     payload = BlobField()
     created = DateTimeField(default=datetime.utcnow)
 
-    # Signature = nacl_sign(json(ordered_content))
-    signature = BlobField()
-
     @classmethod
     def create_from_json(cls, author, obj):
         self = cls()
         self.shard = Shard.get(Shard.id == obj['shard'])
         self.author = author
 
-        # TODO: payload should actually be our signed version of the data
         self.payload = json.dumps(obj['payload'])
 
         self.id = self.hash
         self.save(force_insert=True)
 
-class EntryStamp(BaseModel):
+class EntryStamp(BaseModel, SignatureModel('notary')):
+    HASH_FIELDS = ['entry', 'notary', 'parent', 'created']
+
     entry = ForeignKeyField(Entry, related_name='stamps')
     notary = ForeignKeyField(User)
     parent = ForeignKeyField('self', related_name='children')
-    data = BlobField()
+    created = DateTimeField(default=datetime.utcnow)
+
+    signature = BlobField()
     
 

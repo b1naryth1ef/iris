@@ -3,12 +3,14 @@ import os, logging, sys, peewee
 from collections import OrderedDict
 from peewee import *
 
+from ..common.identity import Identity
+
 from ..common.util import ordered_from_json, encode_sha256, to_ordered, IrisJSONEncoder
 
 log = logging.getLogger(__name__)
 db = SqliteDatabase(None)
 
-__all__ = ['BaseModel', 'init_db', 'db'] + peewee.__all__
+__all__ = ['BaseModel', 'SignatureModel', 'init_db', 'db'] + peewee.__all__
 
 class BaseModel(Model):
     class Meta:
@@ -52,6 +54,13 @@ class BaseModel(Model):
             raise TrustException("Recieved serialized version of %s, with an invalid or spoofed hash (%s vs %s)" %
                 (cls.__name__, result.id, result.hash), TrustException.Level.MALICIOUS)
 
+        # If we're a signed model, lets validate the signature
+        if issubclass(cls, BaseSignatureModel):
+            # If the signature is invalid, someone is trying to be malicious
+            if not result.verify_signature():
+                raise TrustException("Recieved signed version of %s, with invalid signature" % (
+                    cls.__name__, ), TrustException.Level.MALICIOUS)
+
         try:
             # Grab an existing version
             obj = cls.get(cls.id == obj.id)
@@ -64,6 +73,28 @@ class BaseModel(Model):
         except cls.DoesNotExist:
             result.save(force_insert=True)
             return result
+
+class BaseSignatureModel(object):
+    pass
+
+def SignatureModel(sub=None):
+    class _T(Model, BaseSignatureModel):
+        SUB = sub
+            
+        signature = BlobField()
+
+        def verify_signature(self):
+            signer = getattr(self, self.SUB) if self.SUB else self
+            return signer.verify(self.signature, self.hash) 
+
+        def save(self, **kwargs):
+            if kwargs['force_insert']:
+                if not self.signature and hasattr(self, 'secret_key'):
+                    signer = getattr(self, self.SUB) if self.SUB else self
+                    self.signature = signer.sign(self.hash)
+            super(_T, self).save(**kwargs)
+
+    return _T
 
 def create_db(path):
     if os.path.exists(path):

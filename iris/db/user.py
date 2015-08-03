@@ -9,10 +9,11 @@ from .base import *
 
 log = logging.getLogger(__name__)
 
-class User(BaseModel, IdentityMixin):
-    HASH_FIELDS = ['id', 'public_key', 'nickname']
+class User(BaseModel, IdentityMixin, SignatureModel()):
+    HASH_FIELDS = ['id', 'public_key', 'sign_key', 'nickname']
 
     public_key = BlobField()
+    sign_key = BlobField()
 
     # User nickname. This doesn't need to be unique.
     nickname = CharField(max_length=128, null=True)
@@ -28,9 +29,11 @@ class User(BaseModel, IdentityMixin):
         obj = IUser()
         obj.id = self.id
         obj.pubkey = str(self.public_key).encode('hex')
+        obj.signkey = str(self.sign_key).encode('hex')
         obj.nickname = self.nickname
         obj.first_authed = self.first_authed.strftime('%s')
         obj.last_authed = self.last_authed.strftime('%s')
+        obj.signature = str(self.signature).encode('hex')
         return obj
 
     @classmethod
@@ -38,6 +41,8 @@ class User(BaseModel, IdentityMixin):
         return super(User, cls).from_proto(obj, cls(
             id=obj.id,
             public_key=obj.pubkey.decode('hex'),
+            sign_key=obj.signkey.decode('hex'),
+            signature=obj.signature.decode('hex'),
             nickname=obj.nickname))
 
 

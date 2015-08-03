@@ -162,7 +162,7 @@ class IrisDaemon(object):
 
         log.info("Creating new user")
         user = User()
-        user.public_key = ident.public_key
+        user.from_identity(ident)
         user.nickname = raw_input("Nickname? ")
         user.id = user.hash
         user.save(force_insert=True)
@@ -170,6 +170,7 @@ class IrisDaemon(object):
         with open(os.path.join(path, 'profile.json'), 'w') as f:
             base = user.to_dict()
             base['secret_key'] = ident.secret_key.encode('hex')
+            del base['signature']
             f.write(IrisJSONEncoder().encode(base))
 
         print "Created new profile at {}".format(path)
