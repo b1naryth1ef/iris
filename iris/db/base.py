@@ -1,11 +1,12 @@
-import os, logging, sys, peewee
+import os, logging, sys, peewee, json, datetime, arrow
 
 from collections import OrderedDict
 from peewee import *
 
 from ..common.identity import Identity
+from ..common.errors import *
 
-from ..common.util import ordered_from_json, encode_sha256, to_ordered, IrisJSONEncoder
+from ..common.util import ordered_from_json, encode_sha256, to_ordered
 
 log = logging.getLogger(__name__)
 db = SqliteDatabase(None)
@@ -30,18 +31,24 @@ class BaseModel(Model):
                 else:
                     value = getattr(value, value.__class__._meta.get_primary_key_fields()[0].name)
 
+            if isinstance(value, buffer):
+                value = str(value)
+
             if field.endswith('_key'):
                 value = str(value).encode('hex')
 
+            if isinstance(value, datetime.datetime):
+                value = value.replace(tzinfo=None).isoformat()
+
             obj[field] = value
-        
+
         return to_ordered(obj)
 
     def get_hash_dict(self):
         obj = self.to_dict(getattr(self, 'HASH_FIELDS', None), False)
         if 'id' in obj:
             del obj['id']
-        return IrisJSONEncoder().encode(obj)
+        return json.dumps(obj)
 
     @property
     def hash(self):
@@ -64,7 +71,7 @@ class BaseModel(Model):
         try:
             # Grab an existing version
             obj = cls.get(cls.id == obj.id)
-
+    
             # If our hashes don't match, one of us have invalid data
             if obj.hash != result.hash:
                 raise TrustException("Found existing version of %s, but our hashes do not match (%s vs %s)" %
@@ -80,18 +87,19 @@ class BaseSignatureModel(object):
 def SignatureModel(sub=None):
     class _T(Model, BaseSignatureModel):
         SUB = sub
-            
+
         signature = BlobField()
 
         def verify_signature(self):
             signer = getattr(self, self.SUB) if self.SUB else self
-            return signer.verify(self.signature, self.hash) 
+            return signer.verify(self.signature, self.hash)
 
         def save(self, **kwargs):
+            entity = getattr(self, self.SUB) if self.SUB else self
+
             if kwargs['force_insert']:
-                if not self.signature and hasattr(self, 'secret_key'):
-                    signer = getattr(self, self.SUB) if self.SUB else self
-                    self.signature = signer.sign(self.hash)
+                if not self.signature and hasattr(entity, 'secret_key'):
+                    self.signature = entity.sign(self.hash)
             super(_T, self).save(**kwargs)
 
     return _T
@@ -105,9 +113,9 @@ def create_db(path):
     from shard import Shard
     from user import User
     from entry import Entry, EntryStamp
-    from seed import Seed
+    from peer import Peer
 
-    db.create_tables([Shard, User, Entry, EntryStamp, Seed])
+    db.create_tables([Shard, User, Entry, EntryStamp, Peer])
 
 def init_db(path):
     db.init(path)

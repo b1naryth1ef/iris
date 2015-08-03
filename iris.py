@@ -12,6 +12,7 @@ create_parser = subparsers.add_parser('create', help='create new iris entites')
 create_parser.add_argument('type', default='profile')
 create_parser.add_argument('--path', default='~/.iris')
 create_parser.add_argument('--overwrite', action='store_true', help='overwrite if exists')
+create_parser.add_argument('--post', default='', help='path to post for creation')
 
 # Daemon Mode
 daemon_parser = subparsers.add_parser('daemon', help='manage a iris client daemon process')

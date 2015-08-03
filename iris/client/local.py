@@ -1,4 +1,4 @@
-import time, thread, logging, os, miniupnpc, socket, requests
+import time, thread, logging, os, miniupnpc, socket, requests, json
 
 from ..data.base_pb2 import *
 from ..common.util import generate_random_number
@@ -19,7 +19,7 @@ class LocalClient(object):
         self.clients = {}
         self.tickets = {}
 
-        self.ip = os.getenv("IRIS_IP") or requests.get("http://icanhazip.com/").content.strip()
+        self.ip = os.getenv("IRIS_IP") or requests.get("http://ipv4.icanhazip.com/").content.strip()
 
         # Maxiumum peers we will keep
         self.max_peers = 128
@@ -109,6 +109,12 @@ class LocalClient(object):
             shard = Shard.get(Shard.id == packet.shards[0].id)
             self.sync_shard(shard)
             ticket.delete()
+        elif ticket.type == TicketType.SYNC_SHARD:
+            if not len(packet.entries):
+                return
+
+            self.sync_entries(ticket.shard_id, packet.entries)
+            ticket.delete()
 
     def add_ticket(self, ticket):
         ticket.parent = self
@@ -127,13 +133,34 @@ class LocalClient(object):
 
         ticket = self.add_ticket(Ticket(TicketType.JOIN_SHARD, shard_id=id))
         packet = PacketRequestShards()
-        packet.maxsize = 1
+        packet.limit = 1
         packet.shards.append(id)
         packet.peers = True
         map(lambda i: i.send(packet, ticket=ticket), self.clients.values())
 
+        # TODO: subscribe
+
     def sync_shard(self, shard):
-        print 'would sync shard %s' % shard.id
+        ticket = self.add_ticket(Ticket(TicketType.SYNC_SHARD, shard_id=shard.id))
+        packet = PacketSearchEntries()
+        packet.shard = shard.id
+        packet.query = json.dumps({})
+        packet.limit = 1024
+
+        # TODO: only send to ones we know have the shard
+        map(lambda i: i.send(packet, ticket=ticket), self.clients.values())
+
+    def sync_entries(self, shard, entries):
+        ticket = self.add_ticket(Ticket(TicketType.SYNC_ENTRIES, entries=entries))
+        packet = PacketRequestEntries()
+        packet.shard = shard
+        packet.entries.extend(entries)
+        packet.limit = 1024
+        packet.with_authors = True
+        packet.with_stamps = True
+        
+        # TODO: get peers, divide entry set, create seperate tickets, skip existing entries
+        map(lambda i: i.send(packet, ticket=ticket), self.clients.values())
 
     def send_handshake(self, remote, ticket=None):
         packet = PacketBeginHandshake()

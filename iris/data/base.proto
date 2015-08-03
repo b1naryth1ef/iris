@@ -12,9 +12,11 @@ enum PacketType {
   ListPeers = 9;
   RequestShards = 10;
   ListShards = 11;
-  RequestSyncShard = 12;
-  RequestEntries = 13;
-  ListEntries = 14;
+  SubscribeShard = 12;
+  SearchEntries = 13;
+  EntriesSearchResult = 14;
+  RequestEntries = 15;
+  ListEntries = 16;
 }
 
 message IStamp {
@@ -31,7 +33,10 @@ message IEntry {
   required bytes payload = 4;
   required bytes signature = 5;
   required string created = 6;
-  repeated IStamp stamps = 7; 
+
+  // Only set if we get the full entry
+  repeated IStamp stamps = 7;
+  optional IUser author_obj = 8;
 }
 
 message IUser {
@@ -68,8 +73,11 @@ message Packet {
 
 message PacketBeginHandshake {
   required IPeer peer = 1;
-  required uint32 timestamp = 3;
-  required uint32 challenge = 4;
+  required uint32 timestamp = 2;
+  required uint32 challenge = 3;
+
+  // List of shards we are "subscribed" too
+  repeated string shards = 4;
 }
 
 message PacketDenyHandshake {
@@ -79,8 +87,9 @@ message PacketDenyHandshake {
 
 message PacketAcceptHandshake {
   required IPeer peer = 1;
-  required bytes response = 3;
-  required uint32 challenge = 4;
+  required bytes response = 2;
+  required uint32 challenge = 3;
+  repeated string shards = 4;
 }
 
 message PacketCompleteHandshake {
@@ -110,8 +119,13 @@ message PacketListPeers {
   repeated IPeer peers = 1;
 }
 
+message PacketSubscribeShard {
+  required string shard = 1;
+  required bool state = 2;
+}
+
 message PacketRequestShards {
-  required uint32 maxsize = 1;
+  required uint32 limit = 1;
   repeated string shards = 2;
   optional bool peers = 3;
 }
@@ -121,15 +135,23 @@ message PacketListShards {
   repeated IShard peers = 2;
 }
 
-message PacketRequestSyncShard {
-  required string id = 1;
-  optional string query = 2;
+message PacketSearchEntries {
+  required string shard = 1;
+  required uint32 limit = 2;
+  optional string query = 3;
+}
+
+message PacketEntriesSearchResult {
+  repeated string entries = 1;
 }
 
 message PacketRequestEntries {
-  repeated string ids = 1;
-  required uint32 maxsize = 2;
-  optional bool brief = 3;
+  required string shard = 1;
+  repeated string entries = 2;
+  required uint32 limit = 3;
+
+  optional bool with_authors = 4;
+  optional bool with_stamps = 5;
 }
 
 message PacketListEntries {

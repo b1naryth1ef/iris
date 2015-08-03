@@ -1,9 +1,10 @@
-import time, thread, logging
+import time, thread, logging, json, datetime
 
 from ..data.base_pb2 import *
 from ..common.util import packet_from_id, packet_to_id, generate_random_number
 from ..db.user import User
 from ..db.shard import Shard
+from ..db.entry import Entry, EntryStamp
 
 from .packet import PacketWrapper
 
@@ -18,6 +19,9 @@ class RemoteClient(object):
         self.user = None
         self.auth_completed = False
         self.auth_challenge = None
+
+        # List of shards this remote client is subscribed too
+        self.shards = []
 
     def wait_for_handshake(self, delay=5):
         def _f():
@@ -119,6 +123,16 @@ class RemoteClient(object):
                 return self.handle_list_peers(packet)
             elif isinstance(packet.inner, PacketListShards):
                 return self.handle_list_shards(packet)
+            elif isinstance(packet.inner, PacketSubscribeShard):
+                return self.handle_subscribe_shard(packet)
+            elif isinstance(packet.inner, PacketRequestEntries):
+                return self.handle_request_entries(packet)
+            elif isinstance(packet.inner, PacketListEntries):
+                return self.handle_list_entries(packet)
+            elif isinstance(packet.inner, PacketSearchEntries):
+                return self.handle_search_entries(packet)
+            elif isinstance(packet.inner, PacketEntriesSearchResult):
+                return self.handle_entries_search_result(packet)
 
         log.warning("Failed to handle packet %s", packet.inner.__class__.__name__)
 
@@ -151,7 +165,6 @@ class RemoteClient(object):
 
     def handle_accept_handshake(self, packet):
         # If we are already authed, or didn't send this packet we're in trouble
-        print self.auth_challenge, self.user
         if not self.auth_challenge or self.user:
             self.close("R001 invalid handshake packet")
             raise Exception("R001: unexpected PacketAcceptHandshake packet")
@@ -208,6 +221,7 @@ class RemoteClient(object):
         packet.respond(resp)
 
     def handle_request_shards(self, packet):
+        # TODO: send an error if we don't know about a shard
         if len(packet.shards):
             matched = [i for i in packet.shards if i in self.parent.shards]
             resp = PacketListShards()
@@ -234,11 +248,91 @@ class RemoteClient(object):
         log.debug("Attempted to add %s peers from a shared peer set", peered)
 
     def handle_list_shards(self, packet):
-        log.info("Processing a list of shards")
+        log.info("Processing a list of shards (%s)", packet.shards)
         for shard in packet.shards:
             if not Shard.select().where(Shard.id == shard.id).count():
                 log.debug("Adding shard %s", shard.id)
                 Shard.from_proto(shard)
         
         map(self.parent.add_peer, map(lambda i: '{}:{}'.format(i.ip, i.port), packet.peers))
+
+    def handle_subscribe_shard(self, packet):
+        if packet.state and packet.shard not in self.shards:
+            self.shards.append(packet.shard)
+        elif not packet.state and packet.shard in self.shards:
+            self.shards.remove(packet.shard)
+        else:
+            log.warning("Recieved subscribe-shard packet, but I can't do anything about it")
+
+    def handle_request_entries(self, packet):
+        # First, grab the relevant shard
+        try:
+            shard = Shard.get(Shard.id == packet.shard)
+        except Shard.DoesNotExist:
+            # TODO: send back an error
+            log.warning("Cannot respond to RequestEntries, don't have shard %s", packet.shard)
+            return
+        
+        resp = PacketListEntries()
+
+        limit = packet.limit if packet.limit < 1024 else 1024
+        entries = list(Entry.select().where((Entry.shard == shard) & (Entry.id << tuple(packet.entries))).limit(limit))
+
+        resp.entries.extend(map(lambda i: i.to_proto(packet.with_authors, packet.with_stamps), list(entries)))
+        packet.respond(resp)
+
+    def handle_list_entries(self, packet):
+        for entry in packet.entries:
+            log.debug('Synced entry %s', entry.id)
+            obj = Entry.from_proto(entry)
+
+            if entry.author_obj:
+                author = User.from_proto(entry.author_obj)
+
+            map(EntryStamp.from_proto, entry.stamps)
+
+    def handle_search_entries(self, packet):
+        if not packet.outer.ticket:
+            log.error("Refusing to respond to PacketSearchEntries without a ticket")
+            return
+
+        try:
+            shard = Shard.get(Shard.id == packet.shard)
+        except Shard.DoesNotExist:
+            # TODO: send back an error
+            log.warning("Cannot respond to PacketSearchEntries, don't have shard %s", packet.shard)
+            return
+
+        try:
+            query = json.loads(packet.query)
+        except:
+            log.warning("Invalid PacketSearchEntries query: %s", packet.query)
+            return
+
+        if query:
+            base = []
+
+            if 'created_before' in query:
+                base.append((Entry.created < datetime.datetime.fromtimestamp(query['created_before'])))
+
+            if 'created_after' in query:
+                base.append((Entry.created > datetime.datetime.fromtimestamp(query['created_before'])))
+
+            if not len(base):
+                log.error("Invalid Query")
+                return
+
+            entries = Entry.select(Entry.id).where(reduce(lambda a, b: a & b, base))
+        else:
+            entries = Entry.select(Entry.id)
+
+        limit = packet.limit if packet.limit < 1024 else 1024
+        entries = entries.limit(limit)
+
+        resp = PacketEntriesSearchResult()
+        resp.entries.extend(map(lambda i: i.id, entries))
+        packet.respond(resp)
+
+    def handle_entries_search_result(self, packet):
+        print packet.entries
 

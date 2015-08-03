@@ -31,8 +31,6 @@ class User(BaseModel, IdentityMixin, SignatureModel()):
         obj.pubkey = str(self.public_key).encode('hex')
         obj.signkey = str(self.sign_key).encode('hex')
         obj.nickname = self.nickname
-        obj.first_authed = self.first_authed.strftime('%s')
-        obj.last_authed = self.last_authed.strftime('%s')
         obj.signature = str(self.signature).encode('hex')
         return obj
 

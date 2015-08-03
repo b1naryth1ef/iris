@@ -6,8 +6,8 @@ from .client.local import LocalClient
 from .common.identity import Identity
 from .db.base import create_db, init_db
 from .db.user import User
-from .db.seed import Seed
 from .db.shard import Shard
+from .db.entry import Entry
 from .common.util import IrisJSONEncoder
 from .common.log import *
 
@@ -100,6 +100,8 @@ class IrisDaemon(object):
 
         init_db(os.path.join(self.path, 'database.db'))
         self.load_profile()
+
+        print map(lambda i: type(i.created), list(Entry.select()))
 
         if self.seeds:
             self.seeds = filter(bool, self.seeds).split(',')
@@ -199,7 +201,7 @@ class IrisDaemon(object):
         user = User.get(User.id == profile['id'])
         user.secret_key = profile['secret_key'].decode('hex')
 
-        with open(args['path'], 'r') as f:
+        with open(args['post'], 'r') as f:
             entry = Entry.create_from_json(user, json.load(f))
 
         print "Created new entry %s" % entry.id

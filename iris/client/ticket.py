@@ -5,6 +5,8 @@ from ..common.util import random_uuid
 class TicketType(object):
     WARMUP = 1
     JOIN_SHARD = 2
+    SYNC_SHARD = 3
+    SYNC_ENTRIES = 4
 
 class Ticket(object):
     def __init__(self, ttype, duration=None, **kwargs):

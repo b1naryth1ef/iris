@@ -1,6 +1,8 @@
-import logging, json
+import logging, json, arrow
 
 from datetime import datetime
+
+from ..data.base_pb2 import *
 
 from .base import *
 from .shard import Shard
@@ -16,6 +18,33 @@ class Entry(BaseModel, SignatureModel('author')):
     payload = BlobField()
     created = DateTimeField(default=datetime.utcnow)
 
+    def to_proto(self, with_authors=False, with_stamps=False):
+        entry = IEntry()
+        entry.id = self.id
+        entry.shard = self.shard.id
+        entry.author = self.author.id
+        entry.payload = str(self.payload)
+        entry.signature = str(self.signature)
+        entry.created = self.created.isoformat()
+        
+        if with_stamps:
+            entry.stamps.extend(map(lambda i: i.to_proto, self.stamps))
+
+        if with_authors:
+            entry.author_obj.CopyFrom(self.author.to_proto())
+
+        return entry
+
+    @classmethod
+    def from_proto(cls, obj):
+        return super(Entry, cls).from_proto(obj, cls(
+            id=obj.id,
+            shard=obj.shard,
+            author=obj.author,
+            payload=obj.payload,
+            signature=obj.signature,
+            created=arrow.get(obj.created).datetime.replace(tzinfo=None)))
+
     @classmethod
     def create_from_json(cls, author, obj):
         self = cls()
@@ -26,15 +55,34 @@ class Entry(BaseModel, SignatureModel('author')):
 
         self.id = self.hash
         self.save(force_insert=True)
+        return self
 
 class EntryStamp(BaseModel, SignatureModel('notary')):
     HASH_FIELDS = ['entry', 'notary', 'parent', 'created']
 
     entry = ForeignKeyField(Entry, related_name='stamps')
     notary = ForeignKeyField(User)
-    parent = ForeignKeyField('self', related_name='children')
+    parent = ForeignKeyField('self', related_name='children', null=True)
     created = DateTimeField(default=datetime.utcnow)
 
-    signature = BlobField()
-    
+    @classmethod
+    def from_proto(cls, obj):
+        return super(EntryStamp, cls).from_proto(obj, cls(
+            id=obj.id,
+            entry=obj.entry,
+            notary=obj.notary,
+            parent=obj.parent,
+            created=arrow.get(obj.created).datetime.replace(tzinfo=None),
+            signature=obj.signature))
+
+    def to_proto(self):
+        stamp = IStamp()
+        stamp.id = self.id
+        stamp.entry = self.entry.id
+        stamp.notary = self.notary.id
+        stamp.parent = self.parent.id or ''
+        stamp.created = self.created.isoformat()
+        stamp.signature = str(self.signature)
+        return stamp
+
 

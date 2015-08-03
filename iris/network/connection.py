@@ -28,7 +28,7 @@ class Protocol(object):
 
     def connect(self, connstr):
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        host, port = connstr.split(':')
+        host, port = connstr.rsplit(':', 1)
         try:
             s.connect((host, int(port)))
             self.epoll.register(s.fileno(), select.EPOLLIN)
