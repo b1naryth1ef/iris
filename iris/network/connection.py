@@ -25,6 +25,7 @@ class Protocol(object):
         self.socket.bind((options.get('host', '0.0.0.0'), int(options['port'])))
         self.socket.listen(1)
         self.socket.setblocking(0)
+        return self.socket.getsockname()[1]
 
     def connect(self, connstr):
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)

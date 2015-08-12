@@ -15,15 +15,20 @@ class Shard(BaseModel):
     breakout. All other type of data apart from users is hierarcherly organized
     under a shard.
     """
-    HASH_FIELDS = ['uid', 'name', 'desc', 'public', 'meta']
+    HASH_FIELDS = ['uid', 'name', 'desc', 'public', 'pow_load', 'pow_char', 'meta']
 
     uid = CharField(max_length=32, default=random_uuid)
     name = CharField(max_length=128)
     desc = CharField(max_length=2048)
     public = BooleanField(default=True)
+    pow_load = IntegerField(default=3)
+    pow_char = CharField(max_length=1, default='0')
     meta = BlobField()
 
     active = BooleanField(default=True)
+
+    def get_pow(self):
+        return ProofOfWork(load=self.pow_load, char=self.pow_char)
 
     def to_proto(self):
         shard = IShard()
@@ -32,9 +37,11 @@ class Shard(BaseModel):
         shard.name = self.name
         shard.desc = self.desc
         shard.public = self.public
+        shard.pow_load = self.pow_load
+        shard.pow_char = self.pow_char
         shard.meta = str(self.meta)
         return shard
-   
+
     @classmethod
     def from_proto(cls, obj):
         return super(Shard, cls).from_proto(obj, cls(
@@ -43,6 +50,8 @@ class Shard(BaseModel):
             name=obj.name,
             desc=obj.desc,
             public=obj.public,
+            pow_load=obj.pow_load,
+            pow_char=obj.pow_char,
             meta=obj.meta,
             active=False))
 

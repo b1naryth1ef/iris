@@ -3,6 +3,7 @@ import logging, json, arrow
 from datetime import datetime
 
 from ..data.base_pb2 import *
+from ..common.errors import *
 
 from .base import *
 from .shard import Shard
@@ -17,6 +18,7 @@ class Entry(BaseModel, SignatureModel('author')):
     author = ForeignKeyField(User)
     payload = BlobField()
     created = DateTimeField(default=datetime.utcnow)
+    proof = IntegerField()
 
     def to_proto(self, with_authors=False, with_stamps=False):
         entry = IEntry()
@@ -26,7 +28,8 @@ class Entry(BaseModel, SignatureModel('author')):
         entry.payload = str(self.payload)
         entry.signature = str(self.signature)
         entry.created = self.created.isoformat()
-        
+        entry.proof = self.proof
+
         if with_stamps:
             entry.stamps.extend(map(lambda i: i.to_proto, self.stamps))
 
@@ -35,25 +38,39 @@ class Entry(BaseModel, SignatureModel('author')):
 
         return entry
 
+    def validate_proof(self):
+        worker = self.shard.get_pow()
+        return worker.validate(self.hash, self.proof)
+
     @classmethod
     def from_proto(cls, obj):
-        return super(Entry, cls).from_proto(obj, cls(
+        new = cls(
             id=obj.id,
             shard=obj.shard,
             author=obj.author,
             payload=obj.payload,
+            proof = self.proof,
             signature=obj.signature,
-            created=arrow.get(obj.created).datetime.replace(tzinfo=None)))
+            created=arrow.get(obj.created).datetime.replace(tzinfo=None))
+
+        if not new.validate_proof():
+            raise TrustException("Invalid proof of work", TrustException.Level.MALICIOUS)
+
+        super(Entry, cls).from_proto(obj, new)
 
     @classmethod
-    def create_from_json(cls, author, obj):
+    def create_from_json(cls, author, obj, proof=True):
         self = cls()
         self.shard = Shard.get(Shard.id == obj['shard'])
         self.author = author
-
         self.payload = json.dumps(obj['payload'])
-
         self.id = self.hash
+
+        # Calculate proof for hash
+        if proof:
+            worker = self.shard.get_pow(
+            self.proof = worker.work(self.hash)
+
         self.save(force_insert=True)
         return self
 
@@ -84,5 +101,4 @@ class EntryStamp(BaseModel, SignatureModel('notary')):
         stamp.created = self.created.isoformat()
         stamp.signature = str(self.signature)
         return stamp
-
 

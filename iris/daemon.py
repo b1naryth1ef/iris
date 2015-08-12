@@ -3,6 +3,7 @@ import os, logging, shutil, json, sys, socket, thread
 from signal import SIGTERM
 
 from .client.local import LocalClient
+from .common.config import Config
 from .common.identity import Identity
 from .db.base import create_db, init_db
 from .db.user import User
@@ -85,9 +86,8 @@ class IrisSocketRPCServer(BaseRPCServer):
         })
 
 class IrisDaemon(object):
-    def __init__(self, path, port=None, seeds=None, fork=True, upnp=False):
+    def __init__(self, path, seeds=None, fork=True, **kwargs):
         self.path = os.path.expanduser(path)
-        self.port = port
         self.seeds = seeds
         self.fork = fork
 
@@ -101,7 +101,10 @@ class IrisDaemon(object):
         init_db(os.path.join(self.path, 'database.db'))
         self.load_profile()
 
-        print map(lambda i: type(i.created), list(Entry.select()))
+        self.config = Config(os.path.join(self.path, 'config.json'))
+
+        if kwargs.get('port'):
+            self.config.local.port = kwargs['port']
 
         if self.seeds:
             self.seeds = filter(bool, self.seeds).split(',')
@@ -112,7 +115,7 @@ class IrisDaemon(object):
             raise DaemonException("Cannot run, we have no seeds!")
 
         self.shards = list(Shard.select())
-        self.client = LocalClient(self.user, self.shards, self.port, seeds=self.seeds, upnp=upnp)
+        self.client = LocalClient(self.user, self.shards, config=self.config, seeds=self.seeds)
 
         try:
             self.run()
@@ -175,6 +178,8 @@ class IrisDaemon(object):
             del base['signature']
             f.write(IrisJSONEncoder().encode(base))
 
+        Config.create_config(os.path.join(path, 'config.json'))
+
         print "Created new profile at {}".format(path)
 
     @classmethod
@@ -219,4 +224,5 @@ class IrisDaemon(object):
 
     @classmethod
     def from_cli(cls, args):
-        return cls(args['path'], args['port'], args['seed'], not args['no_fork'], args['upnp'])
+        nargs = {k: v for k, v in args.items() if k not in ['path', 'seed']}
+        return cls(args['path'], args['seed'], not args['no_fork'], **nargs)

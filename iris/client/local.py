@@ -1,3 +1,6 @@
+import os, time, thread, json, socket, logging
+# import miniupnpc, requests
+
 import time, thread, logging, os, miniupnpc, socket, requests, json
 
 from ..data.base_pb2 import *
@@ -11,27 +14,45 @@ from .ticket import Ticket, TicketType
 log = logging.getLogger(__name__)
 
 class LocalClient(object):
-    def __init__(self, user, shards, port, seeds=None, upnp=False):
+    def __init__(self, user, shards, config, seeds=None):
         self.user = user
-        self.port = port
-        self.seeds = seeds
         self.shards = {i.id: i for i in shards}
+        self.config = config
+        self.seeds = seeds
+
+        # List of peers we are connected too
         self.clients = {}
         self.tickets = {}
 
-        self.ip = os.getenv("IRIS_IP") or requests.get("http://ipv4.icanhazip.com/").content.strip()
+    def run(self):
+        # If we're going to be peering, create a server and listen on it
+        if self.config.local.enabled:
+            log.info("Local peer server enabled, setting up and listening")
+            self.server = Protocol()
+            port = self.config.local.port or 0
+            self.port = self.server.listen({'port': port, 'host': self.config.local.host})
 
-        # Maxiumum peers we will keep
-        self.max_peers = 128
+        # Attempt to grab this machines IPv4 IP
+        try:
+            self.ip = os.getenv("IRIS_IP") or requests.get("http://ipv4.icanhazip.com/").content.strip()
+        except requests.exceptions.ConnectionError:
+            log.warning("Could not resolve remote (e.g. NAT) IP, using LAN IP")
+            # TOOD: thats not a local ip...
+            self.ip = "127.0.0.1"
 
         # Attempt to map UPnP
-        if upnp:
+        if self.config.nat.upnp:
             thread.start_new_thread(self.update_upnp_loop, ())
 
+        # Start the update tickets thread
         thread.start_new_thread(self.update_tickets_loop, ())
 
-        self.server = Protocol()
-        self.server.listen({'port': port})
+        log.info("Starting LocalClient up...")
+        thread.start_new_thread(self.network_loop, ())
+
+        log.info("Attempting to seed from %s seeds", len(self.seeds))
+        ticket = self.add_ticket(Ticket(TicketType.WARMUP, peers=len(self.seeds), duration=15))
+        map(lambda i: self.add_peer(i, ticket), self.seeds)
 
     def get_local_ip(self):
         return [(s.connect(('8.8.8.8', 80)), s.getsockname()[0], s.close()) for s in [socket.socket(socket.AF_INET, socket.SOCK_DGRAM)]][0][1]
@@ -136,6 +157,8 @@ class LocalClient(object):
         packet.limit = 1
         packet.shards.append(id)
         packet.peers = True
+
+        # TODO: only send to relevant shards
         map(lambda i: i.send(packet, ticket=ticket), self.clients.values())
 
         # TODO: subscribe
@@ -158,7 +181,7 @@ class LocalClient(object):
         packet.limit = 1024
         packet.with_authors = True
         packet.with_stamps = True
-        
+
         # TODO: get peers, divide entry set, create seperate tickets, skip existing entries
         map(lambda i: i.send(packet, ticket=ticket), self.clients.values())
 
@@ -169,10 +192,11 @@ class LocalClient(object):
         packet.peer.user.CopyFrom(self.user.to_proto())
         packet.timestamp = int(time.time())
         packet.challenge = remote.auth_challenge = generate_random_number(8)
+        packet.shards.extend(map(lambda i: i.id, self.shards))
         remote.send(packet, ticket=ticket)
 
     def add_peer(self, conn, ticket=None):
-        if len(self.clients) >= self.max_peers:
+        if len(self.clients) >= self.config.max_peers:
             log.warning("Skipping adding peer `%s`, we have our max number of peers (%s)",
                     conn, len(self.clients))
             return
@@ -186,18 +210,10 @@ class LocalClient(object):
         self.send_handshake(client,ticket)
         return True
 
-    def run(self):
-        log.info("Starting LocalClient up...")
-        thread.start_new_thread(self.network_loop, ())
-
-        log.info("Attempting to seed from %s seeds", len(self.seeds))
-        ticket = self.add_ticket(Ticket(TicketType.WARMUP, peers=len(self.seeds), duration=15))
-        map(lambda i: self.add_peer(i, ticket), self.seeds)
-
     def network_loop(self):
         for update in self.server.poll():
             if update.type == ProtocolUpdateEvent.NEW:
-                if len(self.clients) >= self.max_peers:
+                if len(self.clients) >= self.config.max_peers:
                     log.warning("Denying connection from, we have our max number of peers (%s)",
                             len(self.clients))
                     update.socket.close()
