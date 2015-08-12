@@ -29,7 +29,7 @@ class BaseRPCServer(object):
             os.kill(self.daemon.pid, SIGTERM), True
         else:
             sys.exit(0)
-       
+
     def handle_add_shard(self, obj):
         if self.daemon.client.add_shard(obj['id']):
             return {}, True
@@ -46,7 +46,7 @@ class IrisSocketRPCServer(BaseRPCServer):
         self.socket = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
         self.socket.bind(self.daemon.socket_path)
         self.socket.listen(1)
-    
+
     def serve(self):
         while True:
             conn, addr = self.socket.accept()
@@ -55,7 +55,7 @@ class IrisSocketRPCServer(BaseRPCServer):
     def handle_connection(self, conn, addr):
         while True:
             data = conn.recv(2048)
-            
+
             if not data:
                 return
 
@@ -78,7 +78,7 @@ class IrisSocketRPCServer(BaseRPCServer):
             res, suc = getattr(self, 'handle_{}'.format(data['action']))(data)
             res['success'] = suc
             return json.dumps(res)
-        
+
 
         return json.dumps({
             "error": "Invalid action",
@@ -144,11 +144,11 @@ class IrisDaemon(object):
 
             with open(self.pidfile, 'w') as f:
                 f.write(str(self.pid))
-       
+
         self.client.run()
         self.rpc_server = IrisSocketRPCServer(self)
         self.rpc_server.serve()
-        
+
     @classmethod
     def create_profile(cls, args, path):
         if os.path.exists(path):
@@ -171,7 +171,7 @@ class IrisDaemon(object):
         user.nickname = raw_input("Nickname? ")
         user.id = user.hash
         user.save(force_insert=True)
-        
+
         with open(os.path.join(path, 'profile.json'), 'w') as f:
             base = user.to_dict()
             base['secret_key'] = ident.secret_key.encode('hex')
@@ -195,7 +195,7 @@ class IrisDaemon(object):
         shard.save(force_insert=True)
 
         print "Created new shard %s" % shard.id
-   
+
     @classmethod
     def create_entry(cls, args, path):
         init_db(os.path.join(path, 'database.db'))

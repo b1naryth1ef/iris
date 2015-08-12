@@ -1,6 +1,7 @@
 import logging
 from collections import OrderedDict
 
+from ..common.pow import ProofOfWork
 from ..common.util import random_uuid
 from ..common.identity import IdentityMixin
 from ..data.base_pb2 import *

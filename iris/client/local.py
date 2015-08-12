@@ -192,7 +192,7 @@ class LocalClient(object):
         packet.peer.user.CopyFrom(self.user.to_proto())
         packet.timestamp = int(time.time())
         packet.challenge = remote.auth_challenge = generate_random_number(8)
-        packet.shards.extend(map(lambda i: i.id, self.shards))
+        packet.shards.extend(self.shards.keys())
         remote.send(packet, ticket=ticket)
 
     def add_peer(self, conn, ticket=None):

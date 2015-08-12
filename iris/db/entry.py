@@ -49,7 +49,7 @@ class Entry(BaseModel, SignatureModel('author')):
             shard=obj.shard,
             author=obj.author,
             payload=obj.payload,
-            proof = self.proof,
+            proof = obj.proof,
             signature=obj.signature,
             created=arrow.get(obj.created).datetime.replace(tzinfo=None))
 
@@ -68,8 +68,8 @@ class Entry(BaseModel, SignatureModel('author')):
 
         # Calculate proof for hash
         if proof:
-            worker = self.shard.get_pow(
-            self.proof = worker.work(self.hash)
+            worker = self.shard.get_pow()
+            self.proof, _ = worker.work(self.hash)
 
         self.save(force_insert=True)
         return self
