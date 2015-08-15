@@ -13,6 +13,12 @@ BASE_CONFIG = {
     "nat": {
         "upnp": False,
         "ip": True,
+    },
+    "providers": {
+        "rest": {
+            "port": 7600,
+            "auth": "secret!"
+        }
     }
 }
 

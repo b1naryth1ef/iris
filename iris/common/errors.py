@@ -1,5 +1,4 @@
 
-
 class TrustException(Exception):
     class Level(Exception):
         MALICIOUS = 1

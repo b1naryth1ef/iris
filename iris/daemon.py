@@ -1,4 +1,4 @@
-import os, logging, shutil, json, sys, socket, threading, binascii
+import os, logging, shutil, json, sys, socket, threading, binascii, time
 
 from signal import SIGTERM
 
@@ -12,78 +12,12 @@ from .db.entry import Entry
 from .common.util import IrisJSONEncoder
 from .common.log import *
 
+from .api.rest import RestProvider
+
 log = logging.getLogger(__name__)
 
 class DaemonException(Exception):
     pass
-
-class BaseRPCServer(object):
-    def handle_status(self, obj):
-        return {
-            "pid": self.daemon.pid,
-            "state": self.daemon.state,
-        }, True
-
-    def handle_stop(self, obj):
-        if self.daemon.pid:
-            os.kill(self.daemon.pid, SIGTERM), True
-        else:
-            sys.exit(0)
-
-    def handle_add_shard(self, obj):
-        if self.daemon.client.add_shard(obj['id']):
-            return {}, True
-        else:
-            return {}, False
-
-class IrisSocketRPCServer(BaseRPCServer):
-    def __init__(self, daemon):
-        self.daemon = daemon
-
-        if os.path.exists(self.daemon.socket_path):
-            os.remove(self.daemon.socket_path)
-
-        self.socket = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-        self.socket.bind(self.daemon.socket_path)
-        self.socket.listen(1)
-
-    def serve(self):
-        while True:
-            conn, addr = self.socket.accept()
-            threading.Thread(target=self.handle_connection, args=(conn, addr)).start()
-
-    def handle_connection(self, conn, addr):
-        while True:
-            data = conn.recv(2048)
-
-            if not data:
-                return
-
-            try:
-                data = json.loads(data)
-            except:
-                log.error("Failed to load packet for SocketRPCServer: `%s`", data)
-                continue
-
-            conn.sendall(self.handle_packet(conn, data))
-
-    def handle_packet(self, conn, data):
-        if not 'action' in data:
-            return json.dumps({
-                "error": "invalid request, missing action key",
-                "success": False
-            })
-
-        if hasattr(self, 'handle_{}'.format(data['action'])):
-            res, suc = getattr(self, 'handle_{}'.format(data['action']))(data)
-            res['success'] = suc
-            return json.dumps(res)
-
-
-        return json.dumps({
-            "error": "Invalid action",
-            "success": False
-        })
 
 class IrisDaemon(object):
     def __init__(self, path, seeds=None, fork=True, **kwargs):
@@ -94,6 +28,8 @@ class IrisDaemon(object):
         self.socket_path = os.path.join(self.path, 'daemon.sock')
         self.pidfile = os.path.join(self.path, 'pid')
         self.pid = None
+
+        self.start_time = time.time()
 
         if not os.path.exists(self.path):
             raise DaemonException("Path `{}` does not exist".format(self.path))
@@ -110,12 +46,13 @@ class IrisDaemon(object):
             self.seeds = list(filter(bool, self.seeds.split(',')))
         else:
             self.seeds = list(map(lambda i: '{}:{}'.format(i.ip, i.port), list(Seed.select())))
-        
+
         if not len(self.seeds):
             raise DaemonException("Cannot run, we have no seeds!")
 
         self.shards = list(Shard.select())
         self.client = LocalClient(self.user, self.shards, config=self.config, seeds=self.seeds)
+        self.rest_provider = RestProvider(self)
 
         try:
             self.run()
@@ -145,9 +82,8 @@ class IrisDaemon(object):
             with open(self.pidfile, 'w') as f:
                 f.write(str(self.pid))
 
+        threading.Thread(target=self.rest_provider.run).start()
         self.client.run()
-        self.rpc_server = IrisSocketRPCServer(self)
-        self.rpc_server.serve()
 
     @classmethod
     def create_profile(cls, args, path):

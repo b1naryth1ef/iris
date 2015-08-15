@@ -14,6 +14,10 @@ from .ticket import Ticket, TicketType
 log = logging.getLogger(__name__)
 
 class LocalClient(object):
+    """
+    Represents "our" client, e.g. the client we are currently running. Serves
+    as the parent object for almost every other connection/object we handle.
+    """
     def __init__(self, user, shards, config, seeds=None):
         self.user = user
         self.shards = {i.id: i for i in shards}
