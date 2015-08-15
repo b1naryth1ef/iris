@@ -22,7 +22,6 @@ class ConfigItem(object):
         self.__dict__.update(obj)
 
     def __getitem__(self, item):
-        print item
         return getattr(self, item)
 
 class Config(object):
@@ -33,7 +32,6 @@ class Config(object):
     def deep_load(self, obj, base):
         for k, v in base.items():
             if k not in obj:
-                print k, v
                 obj[k] = v
             elif isinstance(obj[k], dict):
                 obj[k] = self.deep_load(obj[k], v)

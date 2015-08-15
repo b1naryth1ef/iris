@@ -1,7 +1,7 @@
-import os, time, thread, json, socket, logging
+import os, time, threading, json, socket, logging
 # import miniupnpc, requests
 
-import time, thread, logging, os, miniupnpc, socket, requests, json
+import logging, miniupnpc, requests
 
 from ..data.base_pb2 import *
 from ..common.util import generate_random_number
@@ -24,6 +24,11 @@ class LocalClient(object):
         self.clients = {}
         self.tickets = {}
 
+        # Threads
+        self.thread_upnp = threading.Thread(target=self.update_upnp_loop)
+        self.thread_tickets = threading.Thread(target=self.update_tickets_loop)
+        self.thread_network = threading.Thread(target=self.network_loop)
+
     def run(self):
         # If we're going to be peering, create a server and listen on it
         if self.config.local.enabled:
@@ -42,17 +47,17 @@ class LocalClient(object):
 
         # Attempt to map UPnP
         if self.config.nat.upnp:
-            thread.start_new_thread(self.update_upnp_loop, ())
+            self.thread_upnp.start()
 
         # Start the update tickets thread
-        thread.start_new_thread(self.update_tickets_loop, ())
+        self.thread_tickets.start()
 
         log.info("Starting LocalClient up...")
-        thread.start_new_thread(self.network_loop, ())
+        self.thread_network.start()
 
         log.info("Attempting to seed from %s seeds", len(self.seeds))
         ticket = self.add_ticket(Ticket(TicketType.WARMUP, peers=len(self.seeds), duration=15))
-        map(lambda i: self.add_peer(i, ticket), self.seeds)
+        list(map(lambda i: self.add_peer(i, ticket), self.seeds))
 
     def get_local_ip(self):
         return [(s.connect(('8.8.8.8', 80)), s.getsockname()[0], s.close()) for s in [socket.socket(socket.AF_INET, socket.SOCK_DGRAM)]][0][1]
@@ -159,7 +164,7 @@ class LocalClient(object):
         packet.peers = True
 
         # TODO: only send to relevant shards
-        map(lambda i: i.send(packet, ticket=ticket), self.clients.values())
+        list(map(lambda i: i.send(packet, ticket=ticket), self.clients.values()))
 
         # TODO: subscribe
 
@@ -171,7 +176,7 @@ class LocalClient(object):
         packet.limit = 1024
 
         # TODO: only send to ones we know have the shard
-        map(lambda i: i.send(packet, ticket=ticket), self.clients.values())
+        list(map(lambda i: i.send(packet, ticket=ticket), self.clients.values()))
 
     def sync_entries(self, shard, entries):
         ticket = self.add_ticket(Ticket(TicketType.SYNC_ENTRIES, entries=entries))
@@ -183,7 +188,7 @@ class LocalClient(object):
         packet.with_stamps = True
 
         # TODO: get peers, divide entry set, create seperate tickets, skip existing entries
-        map(lambda i: i.send(packet, ticket=ticket), self.clients.values())
+        list(map(lambda i: i.send(packet, ticket=ticket), self.clients.values()))
 
     def send_handshake(self, remote, ticket=None):
         packet = PacketBeginHandshake()
@@ -211,6 +216,7 @@ class LocalClient(object):
         return True
 
     def network_loop(self):
+        log.info("Network loop has started")
         for update in self.server.poll():
             if update.type == ProtocolUpdateEvent.NEW:
                 if len(self.clients) >= self.config.max_peers:

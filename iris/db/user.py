@@ -28,19 +28,19 @@ class User(BaseModel, IdentityMixin, SignatureModel()):
     def to_proto(self):
         obj = IUser()
         obj.id = self.id
-        obj.pubkey = str(self.public_key).encode('hex')
-        obj.signkey = str(self.sign_key).encode('hex')
+        obj.pubkey = self.public_key
+        obj.signkey = self.sign_key
         obj.nickname = self.nickname
-        obj.signature = str(self.signature).encode('hex')
+        obj.signature = self.signature
         return obj
 
     @classmethod
     def from_proto(cls, obj):
         return super(User, cls).from_proto(obj, cls(
             id=obj.id,
-            public_key=obj.pubkey.decode('hex'),
-            sign_key=obj.signkey.decode('hex'),
-            signature=obj.signature.decode('hex'),
+            public_key=obj.pubkey,
+            sign_key=obj.signkey,
+            signature=obj.signature,
             nickname=obj.nickname))
 
 

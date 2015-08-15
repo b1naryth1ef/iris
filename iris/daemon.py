@@ -1,4 +1,4 @@
-import os, logging, shutil, json, sys, socket, thread
+import os, logging, shutil, json, sys, socket, threading, binascii
 
 from signal import SIGTERM
 
@@ -50,7 +50,7 @@ class IrisSocketRPCServer(BaseRPCServer):
     def serve(self):
         while True:
             conn, addr = self.socket.accept()
-            thread.start_new_thread(self.handle_connection, (conn, addr))
+            threading.Thread(target=self.handle_connection, args=(conn, addr)).start()
 
     def handle_connection(self, conn, addr):
         while True:
@@ -107,10 +107,10 @@ class IrisDaemon(object):
             self.config.local.port = kwargs['port']
 
         if self.seeds:
-            self.seeds = filter(bool, self.seeds).split(',')
+            self.seeds = list(filter(bool, self.seeds.split(',')))
         else:
-            self.seeds = map(lambda i: '{}:{}'.format(i.ip, i.port), list(Seed.select()))
-
+            self.seeds = list(map(lambda i: '{}:{}'.format(i.ip, i.port), list(Seed.select())))
+        
         if not len(self.seeds):
             raise DaemonException("Cannot run, we have no seeds!")
 
@@ -131,7 +131,7 @@ class IrisDaemon(object):
             self.profile = json.load(f)
 
         self.user = User.get(User.id == self.profile['id'])
-        self.user.secret_key = self.profile['secret_key'].decode('hex')
+        self.user.secret_key = binascii.unhexlify(self.profile['secret_key'])
 
     def run(self):
         if self.fork:
@@ -168,19 +168,20 @@ class IrisDaemon(object):
         log.info("Creating new user")
         user = User()
         user.from_identity(ident)
-        user.nickname = raw_input("Nickname? ")
+        user.nickname = input("Nickname? ")
         user.id = user.hash
         user.save(force_insert=True)
+        user.verify_signature()
 
         with open(os.path.join(path, 'profile.json'), 'w') as f:
             base = user.to_dict()
-            base['secret_key'] = ident.secret_key.encode('hex')
+            base['secret_key'] = binascii.hexlify(ident.secret_key).decode('utf-8')
             del base['signature']
             f.write(IrisJSONEncoder().encode(base))
 
         Config.create_config(os.path.join(path, 'config.json'))
 
-        print "Created new profile at {}".format(path)
+        print("Created new profile at {}".format(path))
 
     @classmethod
     def create_shard(cls, args, path):
@@ -194,7 +195,7 @@ class IrisDaemon(object):
         shard.id = shard.hash
         shard.save(force_insert=True)
 
-        print "Created new shard %s" % shard.id
+        print("Created new shard %s" % shard.id)
 
     @classmethod
     def create_entry(cls, args, path):
@@ -204,12 +205,12 @@ class IrisDaemon(object):
             profile = json.load(f)
 
         user = User.get(User.id == profile['id'])
-        user.secret_key = profile['secret_key'].decode('hex')
+        user.secret_key = binascii.unhexlify(profile['secret_key'])
 
         with open(args['post'], 'r') as f:
             entry = Entry.create_from_json(user, json.load(f))
 
-        print "Created new entry %s" % entry.id
+        print("Created new entry %s" % entry.id)
 
     @classmethod
     def create_cli(cls, args):

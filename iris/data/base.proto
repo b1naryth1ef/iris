@@ -1,3 +1,4 @@
+syntax = 'proto3';
 
 enum PacketType {
   Invalid = 0;
@@ -20,101 +21,101 @@ enum PacketType {
 }
 
 message IStamp {
-  required string entry = 1;
-  required string notary = 2;
-  required string parent = 3;
-  required bytes signature = 4;
+  string entry = 1;
+  string notary = 2;
+  string parent = 3;
+  bytes signature = 4;
 }
 
 message IEntry {
-  required string id = 1;
-  required string shard = 2;
-  required string author = 3;
-  required bytes payload = 4;
-  required bytes signature = 5;
-  required string created = 6;
-  required uint64 proof = 7;
+  string id = 1;
+  string shard = 2;
+  string author = 3;
+  bytes payload = 4;
+  bytes signature = 5;
+  string created = 6;
+  uint64 proof = 7;
 
   // Only set if we get the full entry
   repeated IStamp stamps = 8;
-  optional IUser author_obj = 9;
+  IUser author_obj = 9;
 }
 
 message IUser {
-  required string id = 1;
-  required string pubkey = 2;
-  required string signkey = 3;
-  required string nickname = 4;
-  required string signature = 5;
-  optional string first_authed = 6;
-  optional string last_authed = 7;
+  string id = 1;
+  bytes pubkey = 2;
+  bytes signkey = 3;
+  string nickname = 4;
+  bytes signature = 5;
+  string first_authed = 6;
+  string last_authed = 7;
 }
 
 message IPeer {
-  required string ip = 1;
-  required uint32 port = 2;
-  required IUser user = 3;
+  string ip = 1;
+  uint32 port = 2;
+  IUser user = 3;
 }
 
 message IShard {
-  required string id = 1;
-  required string uid = 2;
-  required string name = 3;
-  required string desc = 4;
-  required uint32 pow_load = 5;
-  required string pow_char = 6;
-  required bool public = 7;
-  required bytes meta = 8;
+  string id = 1;
+  string uid = 2;
+  string name = 3;
+  string desc = 4;
+  uint32 pow_load = 5;
+  string pow_char = 6;
+  bool public = 7;
+  bytes meta = 8;
   repeated IPeer peers = 9;
 }
 
 message Packet {
-  required PacketType type = 1;
-  required bytes data = 2;
-  optional string ticket = 3;
+  PacketType type = 1;
+  bytes data = 2;
+  string ticket = 3;
 }
 
 message PacketBeginHandshake {
-  required IPeer peer = 1;
-  required uint32 timestamp = 2;
-  required uint32 challenge = 3;
+  IPeer peer = 1;
+  uint32 timestamp = 2;
+  uint32 challenge = 3;
 
   // List of shards we are "subscribed" too
   repeated string shards = 4;
 }
 
 message PacketDenyHandshake {
-  required string reason = 1;
-  required uint32 backoff = 2;
+  string reason = 1;
+  uint32 backoff = 2;
 }
 
 message PacketAcceptHandshake {
-  required IPeer peer = 1;
-  required bytes response = 2;
-  required uint32 challenge = 3;
+  IPeer peer = 1;
+  bytes response = 2;
+  uint32 challenge = 3;
   repeated string shards = 4;
 }
 
 message PacketCompleteHandshake {
-  required bytes response = 1;
+  bytes response = 1;
 }
 
 message PacketPing {
-  required uint32 timestamp = 1;
-  required uint32 challenge = 2;
+  uint32 timestamp = 1;
+  uint32 challenge = 2;
 }
 
 message PacketPong {
-  required uint32 timestamp = 1;
-  required bytes response = 2;
+  uint32 timestamp = 1;
+  bytes response = 2;
 }
 
 message PacketClose {
-  optional string reason = 1;
+  string reason = 1;
 }
 
 message PacketRequestPeers {
-  required uint32 maxsize = 1;
+  uint32 maxsize = 1;
   repeated string shards = 2;
 }
 
@@ -123,14 +124,14 @@ message PacketListPeers {
 }
 
 message PacketSubscribeShard {
-  required string shard = 1;
-  required bool state = 2;
+  string shard = 1;
+  bool state = 2;
 }
 
 message PacketRequestShards {
-  required uint32 limit = 1;
+  uint32 limit = 1;
   repeated string shards = 2;
-  optional bool peers = 3;
+  bool peers = 3;
 }
 
 message PacketListShards {
@@ -139,9 +140,9 @@ message PacketListShards {
 }
 
 message PacketSearchEntries {
-  required string shard = 1;
-  required uint32 limit = 2;
-  optional string query = 3;
+  string shard = 1;
+  uint32 limit = 2;
+  string query = 3;
 }
 
 message PacketEntriesSearchResult {
@@ -149,12 +150,12 @@ message PacketEntriesSearchResult {
 }
 
 message PacketRequestEntries {
-  required string shard = 1;
+  string shard = 1;
   repeated string entries = 2;
-  required uint32 limit = 3;
+  uint32 limit = 3;
 
-  optional bool with_authors = 4;
-  optional bool with_stamps = 5;
+  bool with_authors = 4;
+  bool with_stamps = 5;
 }
 
 message PacketListEntries {

@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 import sys, os, argparse
 
 from iris.daemon import IrisDaemon

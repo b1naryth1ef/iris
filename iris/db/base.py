@@ -1,4 +1,4 @@
-import os, logging, sys, peewee, json, datetime, arrow
+import os, logging, sys, peewee, json, datetime, arrow, binascii
 
 from collections import OrderedDict
 from peewee import *
@@ -31,11 +31,8 @@ class BaseModel(Model):
                 else:
                     value = getattr(value, value.__class__._meta.get_primary_key_fields()[0].name)
 
-            if isinstance(value, buffer):
-                value = str(value)
-
-            if field.endswith('_key'):
-                value = str(value).encode('hex')
+            if isinstance(value, bytes):
+                value = binascii.hexlify(value).decode('utf-8')
 
             if isinstance(value, datetime.datetime):
                 value = value.replace(tzinfo=None).isoformat()
@@ -52,7 +49,7 @@ class BaseModel(Model):
 
     @property
     def hash(self):
-        return encode_sha256(self.get_hash_dict())
+        return encode_sha256(self.get_hash_dict().encode('utf-8'))
 
     @classmethod
     def from_proto(cls, obj, result):
@@ -110,10 +107,10 @@ def create_db(path):
 
     db.init(path)
 
-    from shard import Shard
-    from user import User
-    from entry import Entry, EntryStamp
-    from peer import Peer
+    from .shard import Shard
+    from .user import User
+    from .entry import Entry, EntryStamp
+    from .peer import Peer
 
     db.create_tables([Shard, User, Entry, EntryStamp, Peer])
 

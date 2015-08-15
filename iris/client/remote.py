@@ -1,4 +1,4 @@
-import time, thread, logging, json, datetime
+import time, threading, logging, json, datetime
 
 from ..data.base_pb2 import *
 from ..common.util import packet_from_id, packet_to_id, generate_random_number
@@ -28,7 +28,7 @@ class RemoteClient(object):
             time.sleep(delay)
             if not self.auth_completed or not self.user:
                 self.close("failed to authenticate in time")
-        thread.start_new_thread(_f, ())
+        threading.Thread(target=_f).start()
 
     def update(self):
         inner, outer = self.recv()
@@ -61,7 +61,7 @@ class RemoteClient(object):
         obj.data = data
 
         if ticket:
-            if isinstance(ticket, str) or isinstance(ticket, unicode):
+            if isinstance(ticket, str):
                 obj.ticket = ticket
             else:
                 obj.ticket = ticket.id
@@ -173,10 +173,12 @@ class RemoteClient(object):
         self.conn = (packet.peer.ip, packet.peer.port)
         
         # Validate encoded stuff
-        decoded = self.parent.user.decrypt(packet.response, self.user)
+        decoded = self.parent.user.decrypt(packet.response, self.user).decode('utf-8')
         if decoded != str(self.auth_challenge):
             self.close("invalid challenge response")
-            raise Exception("Invalid challenge response for handshake accept")
+            raise Exception("Invalid challenge response for handshake accept ({} vs {})".format(
+                decoded, self.auth_challenge
+            ))
 
         self.auth_completed = True
 
@@ -193,7 +195,7 @@ class RemoteClient(object):
             self.close("R001 invalid handshake packet")
             raise Exception("R001: unexpected PacketCompleteHandshake packet")
 
-        decoded = self.parent.user.decrypt(packet.response, self.user)
+        decoded = self.parent.user.decrypt(packet.response, self.user).decode('utf-8')
         if decoded != str(self.auth_challenge):
             self.close("invalid challenge response")
             raise Exception("Invalid challenge response for handshake completion")
@@ -202,7 +204,7 @@ class RemoteClient(object):
         log.info("Completed 3-way handshake with %s", self.user)
 
     def handle_request_peers(self, packet):
-        peers = map(lambda i: i.conn, filter(lambda i: i != self and i and i.conn, self.parent.clients.values()))
+        peers = list(map(lambda i: i.conn, filter(lambda i: i != self and i and i.conn, self.parent.clients.values())))
         peers = peers[:packet.maxsize]
 
         log.info("Sending %s peers to %s", len(peers), self.user)
@@ -334,5 +336,5 @@ class RemoteClient(object):
         packet.respond(resp)
 
     def handle_entries_search_result(self, packet):
-        print packet.entries
+        print(packet.entries)
 

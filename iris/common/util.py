@@ -1,4 +1,4 @@
-import random, uuid, json, hashlib, datetime, thread
+import random, uuid, json, hashlib, datetime
 
 from collections import OrderedDict
 from ..data.base_pb2 import *
@@ -8,7 +8,7 @@ class IrisJSONEncoder(json.JSONEncoder):
         if isinstance(obj, datetime.datetime):
             return obj.isoformat()
         else:
-            return super(DateTimeJSONEncoder, self).default(obj)
+            return super(IrisJSONEncoder, self).default(obj)
 
 def to_ordered(obj):
     return OrderedDict(sorted(obj.items()))
@@ -25,7 +25,7 @@ def random_uuid():
     return str(uuid.uuid4()).replace('-', '')
 
 def generate_random_number(dig):
-    return int(reduce(lambda a, b: a + b, map(lambda _: str(random.randint(0, 9)), range(dig))))
+    return int(''.join(map(lambda _: str(random.randint(0, 9)), range(dig))))
 
 def packet_from_id(id):
     name = 'Packet' + PacketType.keys()[PacketType.values().index(id)]
@@ -38,10 +38,4 @@ def packet_to_id(obj):
         raise Exception("Unknown packet type: {}".format(name))
 
     return dict(PacketType.items())[name]
-
-def delayed(f, delay, *args, **kwargs):
-    def _f():
-        time.sleep(delay)
-        f(*args, **kwargs)
-    thread.start_new_thread(_f , ())
 
