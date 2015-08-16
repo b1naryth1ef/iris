@@ -2,7 +2,7 @@ import time, threading, logging, json, datetime
 
 from ..data.base_pb2 import *
 from ..common.util import packet_from_id, packet_to_id, generate_random_number
-from ..db.user import User
+from ..db.user import User, UserSub
 from ..db.shard import Shard
 from ..db.entry import Entry, EntryStamp
 
@@ -20,26 +20,26 @@ class RemoteClient(object):
         self.auth_completed = False
         self.auth_challenge = None
 
-        # List of shards this remote client is subscribed too
+        # Set of shard ids this remote client is subscribed too
         self.shards = set()
 
     def modify_shard_subscription(self, shard, state):
-        # Grab or create the subscription (kind of weird we create on unsub...)
-        sub, created = UserSub.get_or_create(
-            user=self.user,
-            shard=shard)
+        try:
+            shard = Shard.get(Shard.id == shard).get().id
 
-        # If we're subscribing, lets note it down
+            # Grab or create the subscription (kind of weird we create on unsub...)
+            sub, created = UserSub.get_or_create(
+                user=self.user,
+                shard=shard)
+            sub.active = state
+            sub.save()
+        except Shard.DoesNotExist:
+            pass
+
         if state:
-            sub.active = True
-            self.shards.add(shard.id)
-        else:
-            sub.active = False
-
-            if shard.id in self.shards:
-                self.shards.remove(shard.id)
-
-        sub.save()
+            self.shards.add(shard)
+        elif shard in self.shards:
+            self.shards.remove(shard)
 
     def wait_for_handshake(self, delay=5):
         def _f():
@@ -155,6 +155,10 @@ class RemoteClient(object):
                 return self.handle_request_blocks(packet)
             elif isinstance(packet.inner, PacketListBlocks):
                 return self.handle_list_blocks(packet)
+            elif isinstance(packet.inner, PacketRequestEntries):
+                return self.handle_request_entries(packet)
+            elif isinstance(packet.inner, PacketListEntries):
+                return self.handle_list_entries(packet)
 
         log.warning("Failed to handle packet %s", packet.inner.__class__.__name__)
 
@@ -175,12 +179,7 @@ class RemoteClient(object):
         # Let's save this connection, in case we want to say hi later :)
         self.user.add_connection(self.conn)
 
-        # Mark all the shards we have in common as subscribed
-        shards = Shard.select().where(
-            (Shard.id << tuple(packet.shards)) &
-            (Shard.active == True))
-
-        for shard in shards:
+        for shard in packet.shards:
             self.modify_shard_subscription(shard, True)
 
         # Construct response
@@ -287,27 +286,103 @@ class RemoteClient(object):
         for shard in packet.shards:
             if not Shard.select().where(Shard.id == shard.id).count():
                 log.debug("Adding shard %s", shard.id)
+                print(shard)
                 Shard.from_proto(shard)
 
         map(self.parent.add_peer, map(lambda i: '{}:{}'.format(i.ip, i.port), packet.peers))
 
     def handle_subscribe_shard(self, packet):
-        # If we don't have the shard, we really can't do much with it
+        self.modify_shard_subscription(shard.id, packet.state)
+
+    def handle_offer_block(self, packet):
         try:
             shard = Shard.get(Shard.id == packet.shard)
         except Shard.DoesNotExist:
-            log.info("Ignoring shard subscribe request (don't have shard)")
-            return
+            log.info("Ignoring block offer for shard we don't know")
 
-        self.modify_shard_subscription(shard, packet.state)
+        # Load the block
+        block = Block.from_proto(packet.block)
 
-    def handle_offer_block(self, packet):
-        pass
+        # If this block is already commited, skip it
+        if block.commited:
+            raise TrustException("Recieved offer for block we've already commited {}".format(block.id),
+                TrustException.Level.INACCURATE)
+
+        chain = self.parent.shards[shard.id].chain
+        last = shard.get_last_block()
+
+        # Validate the block
+        try:
+            chain.validate_block(last, block)
+        except ChainValidationError:
+            log.exception("Failed to consider block offer:")
+
+        # Now commit it!
+        block.commited = True
+        block.save()
+
+        # Start mining the next block
+        if chain.worker:
+            chain.worker.cancel()
+            threading.Thread(target=self.chain.mine, args=(self.client.user, ))
+
+        # TODO: detect a chain split here and make a decision
+        # TODO: re-share this block to our peers
 
     def handle_request_blocks(self, packet):
-        pass
+        try:
+            shard = Shard.get(Shard.id == packet.shard)
+        except Shard.DoesNotExist:
+            log.warning("Ignoring request for blocks in a shard we don't have")
+            return
+
+        blocks = []
+
+        if packet.start_id and packet.stop_id:
+            try:
+                start = Block.get(
+                    (Block.id == packet.start) &
+                    (Block.shard_id == shard.id))
+            except Shard.DoesNotExist:
+                log.error("Invalid block ID range")
+                return
+
+            # start + the rest of the packets
+            blocks += list(Block.select().where(
+                (Block.commited == True) &
+                (Block.position >= start.position) &
+                (Block.shard_id == shard.id)).order_by(Block.position).limit(32))
+
+        if packet.start_index and packet.stop_index:
+            if abs(packet.stop_index - packet.start_index) > 32:
+                log.error("Block range is too large")
+                return
+
+            if packet.stop_index > 0 and packet.start_index > 0:
+                r = range(packet.start_index, packet.stop_index + 1)
+            elif packet.stop_index < 0 and packet.start_index < 0:
+                r = range(packet.stop_index, packet.start_index - 1)
+            else:
+                log.error("Block range is invalid")
+                return
+
+            for dex in r:
+                blocks.append(shard.get_block_at(dex))
+
+        if packet.blocks:
+            blocks += list(Block.select().where((Block.id << tuple(packet.blocks))))
+
+        # Send response
+        resp = PacketListBlocks()
+        resp.blocks.extend([obj.to_proto(with_entries=not packet.brief) for obj in blocks])
+        packet.respond(resp)
 
     def handle_list_blocks(self, packet):
+        log.debug("got list blocks: {}".format(len(packet.blocks)))
+
+    def handle_request_entries(self, packet):
         pass
 
+    def handle_list_entries(self, packet):
+        pass
 

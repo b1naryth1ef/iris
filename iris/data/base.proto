@@ -14,27 +14,28 @@ enum PacketType {
   RequestShards = 10;
   ListShards = 11;
   SubscribeShard = 12;
-
-  // DEPRECATED --
-  SearchEntries = 13;
-  EntriesSearchResult = 14;
-  RequestEntries = 15;
-  ListEntries = 16;
-  // -- DEPRECATED
-
-  OfferBlock = 17;
-  SyncChain = 18;
-  ListBlocks = 19;
+  OfferBlock = 13;
+  RequestBlocks = 14;
+  ListBlocks = 15;
+  RequestEntries = 16;
+  ListEntries = 17;
 }
 
 message IBlock {
   string id = 1;
-  string shard = 2;
-  uint64 solution = 3;
-  IBlock parent = 4;
-  IUser solver = 5;
+  string uid = 2;
+  string shard = 3;
+  uint64 solution = 4;
+  IBlock parent = 5;
+  IUser solver = 6;
+  uint64 time = 7;
+  string position = 8;
+  bool initial = 9;
+  uint64 proof = 10;
+  bytes signature = 11;
 
-  repeated IEntry entries = 6;
+  repeated string entries = 12;
+  repeated IEntry ientries = 13;
 }
 
 message IEntry {
@@ -71,11 +72,9 @@ message IShard {
   string uid = 2;
   string name = 3;
   string desc = 4;
-  uint32 pow_load = 5;
-  string pow_char = 6;
   bool public = 7;
   bytes meta = 8;
-  IBlock start = 9;
+  IBlock initial = 9;
 
   repeated IPeer peers = 10;
 }
@@ -140,9 +139,8 @@ message PacketSubscribeShard {
 }
 
 message PacketRequestShards {
-  uint32 limit = 1;
-  repeated string shards = 2;
-  bool peers = 3;
+  repeated string shards = 1;
+  bool peers = 2;
 }
 
 message PacketListShards {
@@ -150,47 +148,44 @@ message PacketListShards {
   repeated IShard peers = 2;
 }
 
-// -- DEPRECATED --
-message PacketSearchEntries {
-  string shard = 1;
-  uint32 limit = 2;
-  string query = 3;
-}
-
-message PacketEntriesSearchResult {
-  repeated string entries = 1;
-}
-
-message PacketRequestEntries {
-  string shard = 1;
-  repeated string entries = 2;
-  uint32 limit = 3;
-
-  bool with_authors = 4;
-}
-
-message PacketListEntries {
-  repeated IEntry entries = 1;
-}
-
-// -- DEPRECATED --
-
 // Sent when someone solves the current block. This is used to distribute a new block across the network.
 message PacketOfferBlock {
-  IBlock block = 1;
+  string shard = 1;
+  IBlock block = 2;
 }
 
 // Used to sync any part of the chain.
 message PacketRequestBlocks {
   string shard = 1;
-  // Hash of the block to start at
-  string start = 2;
+  bool brief = 2;
 
-  // Hash of the block to end at, otherwise exactly 10 blocks are synced
-  optional string end = 3;
+  // Option one, give a range of blocks
+  string start_id = 3;
+  string stop_id = 4;
+
+  // Option two, give an offset-range
+  int64 start_index = 5;
+  int64 stop_index = 6;
+
+  // Option three, give a set of block ids
+  repeated string blocks = 7;
 }
 
 message PacketListBlocks {
   repeated IBlock blocks = 1;
+}
+
+message PacketRequestEntries {
+  string shard = 1;
+
+  // List of entries to retrieve
+  repeated string entries = 2;
+
+  // List of blocks to get entires for
+  repeated string blocks = 3;
+}
+
+message PacketListEntries {
+  repeated IEntry entry = 1;
 }
 

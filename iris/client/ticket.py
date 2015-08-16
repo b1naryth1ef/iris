@@ -29,7 +29,7 @@ class Ticket(object):
 
     def _expire(self):
         self.future.wait(self.timeout)
-        log.info("Ticket {} has completed/expired ({})".format(self.id, self.future.completed))
+        log.info("Ticket {} ({}) has completed/expired ({})".format(self.id, self.type, self.future.completed))
 
         if not self.future.completed:
             self.parent.on_ticket_expired(self)

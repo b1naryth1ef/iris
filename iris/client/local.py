@@ -10,6 +10,7 @@ from ..db.shard import Shard
 from ..network.connection import Protocol, ProtocolUpdateEvent
 from .remote import RemoteClient
 from .ticket import Ticket, TicketType
+from .chain import Chain
 
 log = logging.getLogger(__name__)
 
@@ -32,6 +33,14 @@ class LocalClient(object):
         self.thread_upnp = threading.Thread(target=self.update_upnp_loop)
         self.thread_tickets = threading.Thread(target=self.update_tickets_loop)
         self.thread_network = threading.Thread(target=self.network_loop)
+
+    def send_to_shard(self, shard, packet, ticket=None):
+        """
+        Sends a packet to all peers that are part of a shard
+        """
+        for client in self.clients.values():
+            if shard.id in client.shards:
+                client.send(packet, ticket=ticket)
 
     def run(self):
         # If we're going to be peering, create a server and listen on it
@@ -140,78 +149,79 @@ class LocalClient(object):
                 log.debug("Warmup ticket completed, WOULD REQUEST UPDATES HERE")
                 ticket.complete()
         elif ticket.type == TicketType.JOIN_SHARD:
-            log.debug(packet.shards)
+            print("\nA: {}".format(packet.shards))
             if not len(packet.shards):
                 return
+            
             log.info("Completed JOIN_SHARD request")
             shard = Shard.get(Shard.id == packet.shards[0].id)
             self.sync_shard(shard)
             ticket.complete(shard)
         elif ticket.type == TicketType.SYNC_SHARD:
-            if not len(packet.entries):
-                return
-
-            self.sync_entries(ticket.shard_id, packet.entries)
-            ticket.complete()
+            if len(ticket.triggers) == ticket.peers:
+                ticket.complete()
 
     def add_ticket(self, ticket):
         ticket.parent = self
         self.tickets[ticket.id] = ticket
         return ticket
 
-    def add_shard(self, id, subscribe=True):
+    def add_shard(self, id, subscribe=True, timeout=30):
+        """
+        Add a shard and optionally subscribe to it. If we don't have this shard
+        stored locally, we'll attempt to sync it from the network.
+        """
         try:
             shard = Shard.get(Shard.id == id)
 
-            if shard.id not in self.shards and shard.active:
+            if shard.id not in self.shards or subscribe:
+                shard.active = True
                 self.shards[shard.id] = shard
-            elif not shard.active:
-                log.warning("Shard {} already exists but is not active, skipping")
+                self.shards[shard.id].chain = Chain(shard)
             else:
                 log.warning("Shard {} already exists and is actively synced, skipping")
 
             return shard
-        except Shard.DoesNotExist: pass
+        except Shard.DoesNotExist:
+            # We don't have this shard locally, so lets request it from the network
+            ticket = self.add_ticket(Ticket(TicketType.JOIN_SHARD, shard_id=id, timeout=timeout))
+            packet = PacketRequestShards()
+            packet.shards.append(id)
+            packet.peers = True
 
-        ticket = self.add_ticket(Ticket(TicketType.JOIN_SHARD, shard_id=id, timeout=30))
-        packet = PacketRequestShards()
-        packet.limit = 1
-        packet.shards.append(id)
-        packet.peers = True
+            # Send it to all peers we have, regardless of whether they announce this
+            for client in self.clients.values():
+                client.send(packet, ticket=ticket)
 
-        # Send it to all peers we have, regardless of whether they announce this 
-        for client in self.clients.values():
-            client.send(packet, ticket=ticket)
-       
-        return ticket.wait()
+            # Wait for the ticket to complete
+            shard = ticket.wait()
 
-    def subscribe_shard(self, shard):
-        pass
+        # Optionally, subscribe to it
+        if subscribe:
+            packet = PacketSubscribeShard()
+            packet.shard = shard.id
+            packet.state = True
+            self.send_to_shard(shard, packet)
+
+        return shard
 
     def sync_shard(self, shard):
-        raise Exception("DEPRECATED")
-        ticket = self.add_ticket(Ticket(TicketType.SYNC_SHARD, shard_id=shard.id))
-        packet = PacketSearchEntries()
+        # Get the count of peers for the shard we want to sync
+        peers = len([0 for c in self.clients.values() if shard.id in c.shards])
+
+        # Generally we don't want to sync with less than 3 peers
+        if peers < 3:
+            log.warning("Performing an UNSAFE sync on a network with less than 3 peers")
+
+        ticket = self.add_ticket(Ticket(TicketType.SYNC_SHARD, shard_id=shard.id, peers=peers))
+        packet = PacketRequestBlocks()
         packet.shard = shard.id
-        packet.query = json.dumps({})
-        packet.limit = 1024
+        packet.brief = False
+        packet.start_index = -1
+        packet.stop_index = -128
+        self.send_to_shard(shard, packet, ticket)
 
-        # TODO: only send to ones we know have the shard
-        list(map(lambda i: i.send(packet, ticket=ticket), self.clients.values()))
-        
-
-    def sync_entries(self, shard, entries):
-        raise Exception("DEPRECATED")
-        ticket = self.add_ticket(Ticket(TicketType.SYNC_ENTRIES, entries=entries))
-        packet = PacketRequestEntries()
-        packet.shard = shard
-        packet.entries.extend(entries)
-        packet.limit = 1024
-        packet.with_authors = True
-        packet.with_stamps = True
-
-        # TODO: get peers, divide entry set, create seperate tickets, skip existing entries
-        list(map(lambda i: i.send(packet, ticket=ticket), self.clients.values()))
+        return ticket
 
     def send_handshake(self, remote, ticket=None):
         packet = PacketBeginHandshake()

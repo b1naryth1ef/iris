@@ -28,7 +28,6 @@ class ConfigItem(object):
         self.__dict__.update(obj)
 
     def __getitem__(self, item):
-        print(item)
         return getattr(self, item)
 
     def __contains__(self, item):

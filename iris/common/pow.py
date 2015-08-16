@@ -18,7 +18,7 @@ def prover(id, base, match, start, end, response):
     response.put((id, False, None, None))
 
 class ProofOfWork(object):
-    def __init__(self, load=1, char='0', cores=cpu_count(), inc=10000):
+    def __init__(self, load=1, char='0', cores=cpu_count(), inc=1000000):
         self.load = load
         self.char = char
         self.cores = cores
@@ -27,6 +27,10 @@ class ProofOfWork(object):
         self.inc = inc
         self.current = 0
         self.q = Queue()
+        self.cancelled = False
+
+    def cancel(self):
+        self.cancelled = True
 
     def validate(self, base, answer):
         return hashlib.sha256(str(answer) + base).hexdigest().startswith(self.char * self.load)
@@ -39,25 +43,30 @@ class ProofOfWork(object):
         self.current += self.inc
         self.procs[self.id_inc].start()
 
-    def work(self, base, limit=None, inc=10000):
+    def work(self, base, cores=None):
+        self.cores = cores or self.cores
+
         if not isinstance(base, bytes):
             base = base.encode('utf8')
         
         # Seed the workers
         list(map(lambda i: self.add_process(base), range(self.cores)))
         
-        while True:
+        while not self.cancelled:
             id, done, answer, result = self.q.get()
             
             self.procs[id].join()
             del self.procs[id]
             
             if done:
-                for v in self.procs.values():
-                    v.join()
-                return answer, result
+                break
             
             self.add_process(base)
+        
+        for v in self.procs.values():
+            v.join()
+
+        return answer, result
 
     def work2(self, base, limit=None):
         if not isinstance(base, bytes):

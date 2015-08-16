@@ -1,4 +1,3 @@
-
 # Blocks
 ## Initial Blocks
 Initial blocks are very quirky by nature due to the fact they don't follow the standard linear block-chain path. The following attributes are special about initial blocks:

@@ -21,6 +21,12 @@ class Entry(BaseModel, SignatureModel('author')):
     created = DateTimeField(default=datetime.utcnow)
     proof = IntegerField()
 
+    @classmethod
+    def get_uncommited_entries(cls, shard):
+        return cls.select().where(
+            (cls.block >> None) &
+            (cls.shard == shard))
+
     def to_proto(self, with_authors=False, with_stamps=False):
         entry = IEntry()
         entry.id = self.id

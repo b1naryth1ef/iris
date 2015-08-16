@@ -29,13 +29,13 @@ class Future(object):
             sub.release()
 
     def done(self, value):
-        self.finished = True
+        self.completed = True
         self.value = value
         self.wake_children()
 
     def cancel(self, exe=None):
         self.exe = exe
-        self.finished = True
+        self.completed = True
         self.cancelled = True
         self.wake_children()
 

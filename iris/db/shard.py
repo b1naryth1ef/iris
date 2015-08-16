@@ -23,22 +23,53 @@ class Shard(BaseModel):
     breakout. All other type of data apart from users is hierarcherly organized
     under a shard.
     """
-    HASH_FIELDS = ['uid', 'name', 'desc', 'public', 'pow_load', 'pow_char', 'meta', 'initial']
+    HASH_FIELDS = ['uid', 'name', 'desc', 'public', 'meta', 'initial']
 
     uid = CharField(max_length=32, default=random_uuid)
     name = CharField(max_length=128)
     desc = CharField(max_length=2048)
+
+    # If false, we won't ever broadcast we have this, unless somemone has the ID
     public = BooleanField(default=True)
-    pow_load = IntegerField(default=3)
-    pow_char = CharField(max_length=1, default='0')
+
+    # Meta is whatever the hell the implementation wants (generally JSON)
     meta = BlobField()
+
+    # Link to the initial block in the chain
     initial = ForeignKeyField(Block)
 
+    # If false, we won't sync or broadcast this shard
     active = BooleanField(default=True)
 
-    @property
-    def chain(self):
+    def get_chain_length(self):
+        """
+        Returns the current length of the chain
+        """
+        return Block.select().where(
+            (Block.shard == self.shard.id) &
+            (Block.commited == True)).count()
+
+    def get_block_at(self, index):
+        """
+        Returns a block in the chain at a specific index
+        """
+        # If we're negative, start from the front of the chain
+        if index < 0:
+            index = self.get_chain_length() + index
+
+        return Block.get(
+            (Block.shard == self.shard.id) &
+            (Block.commited == True) &
+            (Block.position == str(index)))
+
+    def get_chain(self):
         return Chain(self)
+
+    def get_last_block(self):
+        try:
+            return Block.get((Block.parent >> None) & (Block.initial == False) & (Block.commited == True))
+        except Block.DoesNotExist:
+            return self.initial
 
     def get_pow(self):
         return ProofOfWork(load=self.pow_load, char=self.pow_char)
@@ -54,25 +85,23 @@ class Shard(BaseModel):
         shard.name = self.name
         shard.desc = self.desc
         shard.public = self.public
-        shard.pow_load = self.pow_load
-        shard.pow_char = self.pow_char
         shard.meta = self.meta
-        shard.initial = self.initial
+        shard.initial.MergeFrom(self.initial.to_proto())
         assert(shard.id == self.hash)
         return shard
 
     @classmethod
     def from_proto(cls, obj):
+        Block.from_proto(obj.initial)
+
         return super(Shard, cls).from_proto(obj, cls(
             id=obj.id,
             uid=obj.uid,
             name=obj.name,
             desc=obj.desc,
             public=obj.public,
-            pow_load=obj.pow_load,
-            pow_char=obj.pow_char,
             meta=obj.meta,
-            initial=obj.initial,
+            initial=obj.initial.id,
             active=False))
 
 ShardProxy.initialize(Shard)

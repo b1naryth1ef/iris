@@ -1,4 +1,8 @@
+import logging
+
 from ..common.pow import ProofOfWork
+
+log = logging.getLogger(__name__)
 
 class ChainValidationError(Exception):
     pass
@@ -9,13 +13,36 @@ class Chain(object):
     """
     def __init__(self, shard):
         self.shard = shard
-        self.mining = False
+        self.worker = None
 
-    def mine(self):
+    def mine(self, user):
         """
         Attempts to mine the next block in the chain.
         """
-        self.mining = True
+        # Grab all entries that have not been commited to a chain yet
+        entries = Entry.get_uncommited_entries()
+
+        # Get the last block that was mined
+        last_block = shard.get_last_block()
+
+        # Create a new block
+        block = Block(
+            parent=last_block,
+            solver=user,
+            position=str(int(last_block.position) + 1),
+            shard_id=shard.id)
+
+        # Try to mine it, we'll cancel this if we fail
+        self.worker = self.shard.get_block_pow(block)
+        block.proof, _ = worker.work(block.hash, cores=round(worker.cores / 4) or 1)
+
+        if not block.proof:
+            log.debug("Failed to mine block, I seem to have gotten cancelled!")
+            return
+
+        # TODO: announce to the world how successful we are
+        block.save()
+        self.worker = None
 
     def validate_chain(self, blocks):
         """

@@ -119,7 +119,8 @@ class RestProvider(APIProvider):
             parent=None,
             solver=self.daemon.client.user,
             position='0',
-            initial=True)
+            initial=True,
+            commited=True)
 
         # Solve the initial block and save it
         worker = shard.get_block_pow(block)
@@ -137,7 +138,8 @@ class RestProvider(APIProvider):
         block.save()
 
         # Add the shard to the client
-        self.daemon.client.add_shard(shard.id)
+        self.daemon.client.add_shard(shard.id, timeout=45)
+        self.daemon.client.sync_shard(shard)
 
         raise APIResponse({
             "id": shard.id
@@ -147,7 +149,7 @@ class RestProvider(APIProvider):
         if not request.values.get('id'):
             raise APIError("Missing ID")
 
-        shard = self.daemon.client.add_shard(request.values.get('id'))
+        shard = self.daemon.client.add_shard(request.values.get('id'), timeout=45)
         raise APIResponse({})
 
     @with_object(Shard)

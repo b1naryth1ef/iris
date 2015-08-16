@@ -1,16 +1,19 @@
 # Iris Protocol
-Iris is a distributed sharing protocol that allows members to easily share arbitrarily structured data. It was designed to be a base for other applications and services to build from.
+Iris is a distributed sharing protocol built on similar technology to bitcoin and bittorrent. It was designed to be a base for other applications and services to build from. Generally Iris can be seen as a broker for information, internally it handles extensive logic to aid in syncing, validating, and distributing data.
 
-## Basic Concepts
+## Core Entities
 
-### Authority
-Iris does not have a central, or even elected authority. It is meant to be completely anonymous, distributed, and deterministic. It's security comes from having a wide and unopinionated network, similarly to most anonymous/distributed systems, it breaks down when one set of authority controls too much of the network (although it still gives some guarentees which makes it safer than other alternatives)
+### Shards
+Shards are the base entities in Iris. They allow "scoping" data within a set number of peers, allowing segmentation and categorization of data.
 
-### Transport Layer
-Iris is completely transport-layer agnostic. Although the Python proof of concept and similar libraries require session/stateful like transport layers, in theory Iris could work over any transport (HTTP, RPC, etc).
+### Entry
+An entry is a post that is bound to a shard, and stored within a block. Entries are created by users and can generally contain arbitrary data (with some restricitions)
 
-### Consistency
-Iris provides _no_ guarentees about data consistency. This was a mindful choice allowing it to remain completely distributed, and hard to break. Through nifty features of the protocol, this data-inconsistency can be used to determine and isolate bad actors.
+## Core Concepts
 
-### Spam/Abuse
-Iris implements a proof of work requirement for all actions and entries, making it hard to abuse.
+### Block Chain
+Iris uses a block chain to verify historical validity and existance for its entries. Unlike bitcoin, Iris provides no explicit reward for mining (although it benefits users wanting to post).
+
+
+
+
