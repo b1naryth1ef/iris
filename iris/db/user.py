@@ -6,6 +6,7 @@ from ..common.identity import IdentityMixin
 from ..data.base_pb2 import *
 
 from .base import *
+from .proxies import ShardProxy
 
 log = logging.getLogger(__name__)
 
@@ -32,6 +33,7 @@ class User(BaseModel, IdentityMixin, SignatureModel()):
         obj.signkey = self.sign_key
         obj.nickname = self.nickname
         obj.signature = self.signature
+        assert(obj.id == self.hash)
         return obj
 
     @classmethod
@@ -43,4 +45,33 @@ class User(BaseModel, IdentityMixin, SignatureModel()):
             signature=obj.signature,
             nickname=obj.nickname))
 
+    def add_connection(self, conn):
+        host, port = conn
+
+        conn, created = UserConn.get_or_create(
+            user=self,
+            host=host,
+            port=port)
+
+        conn.last_seen = datetime.utcnow()
+        conn.conns += 1
+        conn.save()
+
+class UserSub(BaseModel):
+    id = IntegerField(primary_key=True)
+
+    user = ForeignKeyField(User)
+    shard = ForeignKeyField(ShardProxy)
+    active = BooleanField(default=True)
+
+class UserConn(BaseModel):
+    id = IntegerField(primary_key=True)
+
+    user = ForeignKeyField(User)
+
+    host = CharField(max_length=256)
+    port = IntegerField()
+
+    last_seen = DateTimeField(default=datetime.utcnow)
+    conns = IntegerField(default=1)
 

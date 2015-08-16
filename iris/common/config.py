@@ -28,13 +28,20 @@ class ConfigItem(object):
         self.__dict__.update(obj)
 
     def __getitem__(self, item):
+        print(item)
         return getattr(self, item)
+
+    def __contains__(self, item):
+        return item in self.__dict__
+
+    def get(self, *args, **kwargs):
+        return self.__dict__.get(*args, **kwargs)
 
 class Config(object):
     def __init__(self, path):
         self.data = json.load(open(path))
         self.__dict__.update(self.deep_load(self.data, BASE_CONFIG)._base)
-        
+
     def deep_load(self, obj, base):
         for k, v in base.items():
             if k not in obj:

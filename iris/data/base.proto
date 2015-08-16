@@ -14,17 +14,27 @@ enum PacketType {
   RequestShards = 10;
   ListShards = 11;
   SubscribeShard = 12;
+
+  // DEPRECATED --
   SearchEntries = 13;
   EntriesSearchResult = 14;
   RequestEntries = 15;
   ListEntries = 16;
+  // -- DEPRECATED
+
+  OfferBlock = 17;
+  SyncChain = 18;
+  ListBlocks = 19;
 }
 
-message IStamp {
-  string entry = 1;
-  string notary = 2;
-  string parent = 3;
-  bytes signature = 4;
+message IBlock {
+  string id = 1;
+  string shard = 2;
+  uint64 solution = 3;
+  IBlock parent = 4;
+  IUser solver = 5;
+
+  repeated IEntry entries = 6;
 }
 
 message IEntry {
@@ -37,7 +47,6 @@ message IEntry {
   uint64 proof = 7;
 
   // Only set if we get the full entry
-  repeated IStamp stamps = 8;
   IUser author_obj = 9;
 }
 
@@ -66,7 +75,9 @@ message IShard {
   string pow_char = 6;
   bool public = 7;
   bytes meta = 8;
-  repeated IPeer peers = 9;
+  IBlock start = 9;
+
+  repeated IPeer peers = 10;
 }
 
 message Packet {
@@ -139,6 +150,7 @@ message PacketListShards {
   repeated IShard peers = 2;
 }
 
+// -- DEPRECATED --
 message PacketSearchEntries {
   string shard = 1;
   uint32 limit = 2;
@@ -155,11 +167,30 @@ message PacketRequestEntries {
   uint32 limit = 3;
 
   bool with_authors = 4;
-  bool with_stamps = 5;
 }
 
 message PacketListEntries {
   repeated IEntry entries = 1;
 }
 
+// -- DEPRECATED --
+
+// Sent when someone solves the current block. This is used to distribute a new block across the network.
+message PacketOfferBlock {
+  IBlock block = 1;
+}
+
+// Used to sync any part of the chain.
+message PacketRequestBlocks {
+  string shard = 1;
+  // Hash of the block to start at
+  string start = 2;
+
+  // Hash of the block to end at, otherwise exactly 10 blocks are synced
+  optional string end = 3;
+}
+
+message PacketListBlocks {
+  repeated IBlock blocks = 1;
+}
 

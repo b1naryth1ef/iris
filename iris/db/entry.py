@@ -6,15 +6,16 @@ from ..data.base_pb2 import *
 from ..common.errors import *
 
 from .base import *
-from .shard import Shard
 from .user import User
+from .proxies import ShardProxy
 
 log = logging.getLogger(__name__)
+
 
 class Entry(BaseModel, SignatureModel('author')):
     HASH_FIELDS = ["shard", "author", "payload", "created"]
 
-    shard = ForeignKeyField(Shard)
+    shard = ForeignKeyField(ShardProxy)
     author = ForeignKeyField(User)
     payload = BlobField()
     created = DateTimeField(default=datetime.utcnow)
@@ -35,7 +36,8 @@ class Entry(BaseModel, SignatureModel('author')):
 
         if with_authors:
             entry.author_obj.CopyFrom(self.author.to_proto())
-
+        
+        assert(entry.id == self.hash)
         return entry
 
     def validate_proof(self):
@@ -60,6 +62,7 @@ class Entry(BaseModel, SignatureModel('author')):
 
     @classmethod
     def create_from_json(cls, author, obj, proof=True):
+        raise Exception("DEPRECATED")
         self = cls()
         self.shard = Shard.get(Shard.id == obj['shard'])
         self.author = author

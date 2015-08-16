@@ -67,11 +67,12 @@ class LocalClient(object):
         return [(s.connect(('8.8.8.8', 80)), s.getsockname()[0], s.close()) for s in [socket.socket(socket.AF_INET, socket.SOCK_DGRAM)]][0][1]
 
     def update_tickets_loop(self):
+        return
         while True:
             for ticket in self.tickets.values():
                 if ticket.is_expired():
                     self.on_ticket_expired(ticket)
-                    del self.tickets[ticket.id]
+                    ticket.delete()
             time.sleep(5)
 
     def update_upnp_loop(self):
@@ -116,6 +117,11 @@ class LocalClient(object):
         elif ticket.type == TicketType.JOIN_SHARD:
             log.warning("Failed to join shard %s, could not find it amongst peers!", ticket.shard_id)
 
+    def on_ticket_error(self, ticket, err):
+        ticket = self.tickets.get(ticket)
+        if ticket:
+            ticket.delete(err)
+
     def on_ticket_triggered_pre(self, ticket, client, packet):
         if ticket not in self.tickets:
             return
@@ -132,47 +138,58 @@ class LocalClient(object):
         if ticket.type == TicketType.WARMUP:
             if len(ticket.triggers) == ticket.peers:
                 log.debug("Warmup ticket completed, WOULD REQUEST UPDATES HERE")
-                ticket.delete()
+                ticket.complete()
         elif ticket.type == TicketType.JOIN_SHARD:
+            log.debug(packet.shards)
             if not len(packet.shards):
                 return
+            log.info("Completed JOIN_SHARD request")
             shard = Shard.get(Shard.id == packet.shards[0].id)
             self.sync_shard(shard)
-            ticket.delete()
+            ticket.complete(shard)
         elif ticket.type == TicketType.SYNC_SHARD:
             if not len(packet.entries):
                 return
 
             self.sync_entries(ticket.shard_id, packet.entries)
-            ticket.delete()
+            ticket.complete()
 
     def add_ticket(self, ticket):
         ticket.parent = self
         self.tickets[ticket.id] = ticket
         return ticket
 
-    def add_shard(self, id):
+    def add_shard(self, id, subscribe=True):
         try:
             shard = Shard.get(Shard.id == id)
-            if not shard.active:
-                log.info("Shard exists but is not active, reactivating and syncing")
-                shard.active = True
-                self.sync_shard(shard)
-            return
+
+            if shard.id not in self.shards and shard.active:
+                self.shards[shard.id] = shard
+            elif not shard.active:
+                log.warning("Shard {} already exists but is not active, skipping")
+            else:
+                log.warning("Shard {} already exists and is actively synced, skipping")
+
+            return shard
         except Shard.DoesNotExist: pass
 
-        ticket = self.add_ticket(Ticket(TicketType.JOIN_SHARD, shard_id=id))
+        ticket = self.add_ticket(Ticket(TicketType.JOIN_SHARD, shard_id=id, timeout=30))
         packet = PacketRequestShards()
         packet.limit = 1
         packet.shards.append(id)
         packet.peers = True
 
-        # TODO: only send to relevant shards
-        list(map(lambda i: i.send(packet, ticket=ticket), self.clients.values()))
+        # Send it to all peers we have, regardless of whether they announce this 
+        for client in self.clients.values():
+            client.send(packet, ticket=ticket)
+       
+        return ticket.wait()
 
-        # TODO: subscribe
+    def subscribe_shard(self, shard):
+        pass
 
     def sync_shard(self, shard):
+        raise Exception("DEPRECATED")
         ticket = self.add_ticket(Ticket(TicketType.SYNC_SHARD, shard_id=shard.id))
         packet = PacketSearchEntries()
         packet.shard = shard.id
@@ -181,8 +198,10 @@ class LocalClient(object):
 
         # TODO: only send to ones we know have the shard
         list(map(lambda i: i.send(packet, ticket=ticket), self.clients.values()))
+        
 
     def sync_entries(self, shard, entries):
+        raise Exception("DEPRECATED")
         ticket = self.add_ticket(Ticket(TicketType.SYNC_ENTRIES, entries=entries))
         packet = PacketRequestEntries()
         packet.shard = shard

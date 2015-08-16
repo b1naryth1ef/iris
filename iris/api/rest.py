@@ -3,12 +3,10 @@ from flask import Flask, jsonify, request
 
 from ..db.shard import Shard
 from ..db.user import User
+from ..db.block import Block
 
 from ..common import __VERSION__
 from .provider import APIProvider
-
-# POST /shards/<id>/modify
-# POST /shards/<id>/update
 
 class APIBase(Exception):
     pass
@@ -101,7 +99,7 @@ class RestProvider(APIProvider):
         raise APIResponse({
             "shards": list(map(lambda i: i.to_dict(), shards))
         })
-    
+
     @with_object(Shard)
     def route_shards_info(self, shard):
         raise APIResponse({"shard": shard.to_dict()})
@@ -116,22 +114,58 @@ class RestProvider(APIProvider):
         except KeyError as e:
             raise APIError("Invalid Payload: {}".format(e))
 
+        # Create the initial block
+        block = Block(
+            parent=None,
+            solver=self.daemon.client.user,
+            position='0',
+            initial=True)
+
+        # Solve the initial block and save it
+        worker = shard.get_block_pow(block)
+        block.proof, _ = worker.work(block.hash)
+        block.id = block.hash
+        block.save(force_insert=True)
+
+        # Now finish creating the shard
+        shard.initial = block
         shard.id = shard.hash
         shard.save(force_insert=True)
+
+        # Finally, update our block with a utility reference to the shard
+        block.shard_id = shard.id
+        block.save()
+
+        # Add the shard to the client
+        self.daemon.client.add_shard(shard.id)
 
         raise APIResponse({
             "id": shard.id
         })
 
-    def route_shards_add(self, id):
-        # TODO: request the shard add, async wait on tickets
-        pass
-    
-    def route_shards_delete(self, id):
-        pass
+    def route_shards_add(self):
+        if not request.values.get('id'):
+            raise APIError("Missing ID")
 
-    def route_shards_edit(self, id):
-        pass
+        shard = self.daemon.client.add_shard(request.values.get('id'))
+        raise APIResponse({})
+
+    @with_object(Shard)
+    def route_shards_delete(self, shard):
+        shard.delete_instance()
+        raise APIResponse({})
+
+    @with_object(Shard)
+    def route_shards_edit(self, shard):
+        if 'active' in request.json:
+            shard.active = request.json['active']
+
+            if shard.active == False and shard.id in self.daemon.client.shards:
+                del self.daemon.client.shards[shard.id]
+
+        shard.save()
+        raise APIResponse({})
 
     def route_shards_sync(self, id):
         pass
+

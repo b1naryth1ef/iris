@@ -120,20 +120,6 @@ class IrisDaemon(object):
         print("Created new profile at {}".format(path))
 
     @classmethod
-    def create_shard(cls, args, path):
-        init_db(os.path.join(path, 'database.db'))
-
-        shard = Shard()
-        shard.name = raw_input("Name? ")
-        shard.desc = raw_input("Desc? ")
-        shard.public = raw_input("Public (Y/n)? ").lower()[0] == 'y'
-        shard.meta = ""
-        shard.id = shard.hash
-        shard.save(force_insert=True)
-
-        print("Created new shard %s" % shard.id)
-
-    @classmethod
     def create_entry(cls, args, path):
         init_db(os.path.join(path, 'database.db'))
 

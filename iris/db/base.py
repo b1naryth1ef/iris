@@ -31,11 +31,17 @@ class BaseModel(Model):
                 else:
                     value = getattr(value, value.__class__._meta.get_primary_key_fields()[0].name)
 
-            if isinstance(value, bytes):
+            if field.endswith('_key') or field == 'signature' and isinstance(value, bytes):
                 value = binascii.hexlify(value).decode('utf-8')
+
+            if isinstance(value, bytes):
+                value = value.decode('utf-8')
 
             if isinstance(value, datetime.datetime):
                 value = value.replace(tzinfo=None).isoformat()
+
+            if isinstance(value, peewee.SelectQuery):
+                value = list(value)
 
             obj[field] = value
 
@@ -68,7 +74,7 @@ class BaseModel(Model):
         try:
             # Grab an existing version
             obj = cls.get(cls.id == obj.id)
-    
+
             # If our hashes don't match, one of us have invalid data
             if obj.hash != result.hash:
                 raise TrustException("Found existing version of %s, but our hashes do not match (%s vs %s)" %
@@ -94,7 +100,7 @@ def SignatureModel(sub=None):
         def save(self, **kwargs):
             entity = getattr(self, self.SUB) if self.SUB else self
 
-            if kwargs['force_insert']:
+            if kwargs.get('force_insert'):
                 if not self.signature and hasattr(entity, 'secret_key'):
                     self.signature = entity.sign(self.hash)
             super(_T, self).save(**kwargs)
@@ -108,11 +114,11 @@ def create_db(path):
     db.init(path)
 
     from .shard import Shard
-    from .user import User
-    from .entry import Entry, EntryStamp
-    from .peer import Peer
+    from .user import User, UserSub, UserConn
+    from .entry import Entry
+    from .block import Block, BlockEntry
 
-    db.create_tables([Shard, User, Entry, EntryStamp, Peer])
+    db.create_tables([Shard, User, UserSub, UserConn, Entry, Block, BlockEntry])
 
 def init_db(path):
     db.init(path)
