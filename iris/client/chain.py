@@ -1,6 +1,9 @@
-import logging
+import logging, threading
 
 from ..common.pow import ProofOfWork
+from ..db.entry import Entry
+from ..db.block import Block
+
 
 log = logging.getLogger(__name__)
 
@@ -15,12 +18,20 @@ class Chain(object):
         self.shard = shard
         self.worker = None
 
+    def start_miner(self, user):
+        if not self.worker:
+            threading.Thread(target=self.mine, args=(user, )).start()
+
     def mine(self, user):
         """
         Attempts to mine the next block in the chain.
         """
         # Grab all entries that have not been commited to a chain yet
-        entries = Entry.get_uncommited_entries()
+        entries =Entry.get_uncommited_entries(self.shard)
+
+        if not entries.count():
+            log.warning("Skipping mining a block right now, we have no entries to mine")
+            return
 
         # Get the last block that was mined
         last_block = shard.get_last_block()
@@ -32,7 +43,11 @@ class Chain(object):
             position=str(int(last_block.position) + 1),
             shard_id=shard.id)
 
+        for entry in entries:
+            block.add_entry(entry)
+
         # Try to mine it, we'll cancel this if we fail
+        log.info("Starting to mine new block {} with {} new entries".format(block.position, block.entries))
         self.worker = self.shard.get_block_pow(block)
         block.proof, _ = worker.work(block.hash, cores=round(worker.cores / 4) or 1)
 
@@ -41,7 +56,9 @@ class Chain(object):
             return
 
         # TODO: announce to the world how successful we are
+        block.id = block.hash
         block.save()
+        log.info("Successfully mined new block: {}".format(block.id))
         self.worker = None
 
     def validate_chain(self, blocks):

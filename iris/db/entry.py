@@ -4,6 +4,7 @@ from datetime import datetime
 
 from ..data.base_pb2 import *
 from ..common.errors import *
+from ..common.util import encode_sha256
 
 from .base import *
 from .user import User
@@ -13,26 +14,47 @@ log = logging.getLogger(__name__)
 
 
 class Entry(BaseModel, SignatureModel('author')):
-    HASH_FIELDS = ["shard", "author", "payload", "created"]
+    HASH_FIELDS = ["shard", "author", "meta", "payload_hash", "created"]
 
     shard = ForeignKeyField(ShardProxy)
     author = ForeignKeyField(User)
-    payload = BlobField()
+    meta = BlobField()
+    payload_hash = CharField(max_length=64)
     created = DateTimeField(default=datetime.utcnow)
     proof = IntegerField()
+
+    # Payload doesn't have to be synced
+    payload = BlobField(null=True)
+
+    def set_payload(self, payload):
+        self.payload = payload
+        self.payload_hash = encode_sha256(payload.encode('utf-8'))
+
+    @property
+    def block(self):
+        from .block import BlockEntry
+        try:
+            return BlockEntry.get(BlockEntry.entry == self).block
+        except BlockEntry.DoesNotExist:
+            return None
+
+    @property
+    def commited(self):
+        return self.block and self.block.commited
 
     @classmethod
     def get_uncommited_entries(cls, shard):
         return cls.select().where(
-            (cls.block >> None) &
+            (cls.block == None) &
             (cls.shard == shard))
 
-    def to_proto(self, with_authors=False, with_stamps=False):
+    def to_proto(self, with_authors=False, with_stamps=False, with_payload=False):
         entry = IEntry()
         entry.id = self.id
         entry.shard = self.shard.id
         entry.author = self.author.id
-        entry.payload = str(self.payload)
+        entry.meta = str(self.meta)
+        entry.payload_hash = str(self.payload_hash)
         entry.signature = str(self.signature)
         entry.created = self.created.isoformat()
         entry.proof = self.proof
@@ -42,7 +64,10 @@ class Entry(BaseModel, SignatureModel('author')):
 
         if with_authors:
             entry.author_obj.CopyFrom(self.author.to_proto())
-        
+
+        if with_payload:
+            entry.payload = self.payload
+
         assert(entry.id == self.hash)
         return entry
 
@@ -56,10 +81,14 @@ class Entry(BaseModel, SignatureModel('author')):
             id=obj.id,
             shard=obj.shard,
             author=obj.author,
+            meta=obj.meta,
+            payload_hash=obj.payload_hash,
             payload=obj.payload,
             proof = obj.proof,
             signature=obj.signature,
             created=arrow.get(obj.created).datetime.replace(tzinfo=None))
+
+        # TODO: check hash of payload
 
         if not new.validate_proof():
             raise TrustException("Invalid proof of work", TrustException.Level.MALICIOUS)

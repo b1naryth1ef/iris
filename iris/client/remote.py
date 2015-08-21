@@ -149,8 +149,10 @@ class RemoteClient(object):
                 return self.handle_list_shards(packet)
             elif isinstance(packet.inner, PacketSubscribeShard):
                 return self.handle_subscribe_shard(packet)
-            elif isinstance(packet.inner, PacketOfferblock):
+            elif isinstance(packet.inner, PacketOfferBlock):
                 return self.handle_offer_block(packet)
+            elif isinstance(packet.inner, PacketOfferEntry):
+                return self.handle_offer_Entry(packet)
             elif isinstance(packet.inner, PacketRequestBlocks):
                 return self.handle_request_blocks(packet)
             elif isinstance(packet.inner, PacketListBlocks):
@@ -159,6 +161,7 @@ class RemoteClient(object):
                 return self.handle_request_entries(packet)
             elif isinstance(packet.inner, PacketListEntries):
                 return self.handle_list_entries(packet)
+
 
         log.warning("Failed to handle packet %s", packet.inner.__class__.__name__)
 
@@ -220,7 +223,7 @@ class RemoteClient(object):
         packet.respond(resp, encrypt=False)
 
         # Finally request a list of peers
-        self.send(PacketRequestPeers(maxsize=128, shards=self.parent.shards))
+        self.send(PacketRequestPeers(maxsize=128, shards=self.parent.shards.keys()))
 
     def handle_complete_handshake(self, packet):
         if not self.auth_challenge or not self.user or self.auth_completed:
@@ -299,6 +302,7 @@ class RemoteClient(object):
             shard = Shard.get(Shard.id == packet.shard)
         except Shard.DoesNotExist:
             log.info("Ignoring block offer for shard we don't know")
+            return
 
         # Load the block
         block = Block.from_proto(packet.block)
@@ -328,6 +332,23 @@ class RemoteClient(object):
 
         # TODO: detect a chain split here and make a decision
         # TODO: re-share this block to our peers
+
+    def handle_offer_entry(self, packet):
+        shard = self.parent.shards.get(packet.shard)
+        if not shard:
+            log.info("Ignoring entry offer for shard we don't know")
+            return
+
+        # Create the entry from the packet
+        entry = Entry.from_proto(packet.entry)
+
+        # TODO: TrustError
+        if not entry.validate_proof():
+            log.error("Recieved packet with invalid proof!")
+            return
+
+        if not shard.chain.worker:
+            shard.chain.start_miner(self.parent.user)
 
     def handle_request_blocks(self, packet):
         try:

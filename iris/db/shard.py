@@ -71,8 +71,8 @@ class Shard(BaseModel):
         except Block.DoesNotExist:
             return self.initial
 
-    def get_pow(self):
-        return ProofOfWork(load=self.pow_load, char=self.pow_char)
+    def get_pow(self, obj):
+        return ProofOfWork(load=EffortCalculator(self).calculate(obj))
 
     def get_block_pow(self, block):
         calc = EffortCalculator(self)

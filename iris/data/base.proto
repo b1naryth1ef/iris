@@ -15,10 +15,11 @@ enum PacketType {
   ListShards = 11;
   SubscribeShard = 12;
   OfferBlock = 13;
-  RequestBlocks = 14;
-  ListBlocks = 15;
-  RequestEntries = 16;
-  ListEntries = 17;
+  OfferEntry = 14;
+  RequestBlocks = 15;
+  ListBlocks = 16;
+  RequestEntries = 17;
+  ListEntries = 18;
 }
 
 message IBlock {
@@ -42,13 +43,17 @@ message IEntry {
   string id = 1;
   string shard = 2;
   string author = 3;
-  bytes payload = 4;
+  bytes meta = 4;
   bytes signature = 5;
-  string created = 6;
-  uint64 proof = 7;
+  string payload_hash = 6;
+  string created = 7;
+  uint64 proof = 8;
+
+  // Only set if we want to download the full payload
+  bytes payload = 9;
 
   // Only set if we get the full entry
-  IUser author_obj = 9;
+  IUser author_obj = 10;
 }
 
 message IUser {
@@ -152,6 +157,11 @@ message PacketListShards {
 message PacketOfferBlock {
   string shard = 1;
   IBlock block = 2;
+}
+
+// Used to broadcast a new entry to the network
+message PacketOfferEntry {
+  IEntry entry = 1;
 }
 
 // Used to sync any part of the chain.

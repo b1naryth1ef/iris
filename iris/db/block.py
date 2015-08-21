@@ -28,6 +28,9 @@ class Block(BaseModel, SignatureModel('solver')):
     proof = IntegerField()
     commited = BooleanField(default=False)
 
+    def add_entry(self, entry):
+        return BlockEntry.create(block=self, entry=entry)
+
     @property
     def entries(self):
         return list(map(lambda i: i.entry.id,

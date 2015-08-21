@@ -21,9 +21,13 @@ class LocalClient(object):
     """
     def __init__(self, user, shards, config, seeds=None):
         self.user = user
-        self.shards = {i.id: i for i in shards}
+        self.shards = {}
         self.config = config
         self.seeds = seeds
+
+        # Add shards
+        for shard in shards:
+            self.add_shard(shard, subscribe=False)
 
         # List of peers we are connected too
         self.clients = {}
@@ -149,10 +153,9 @@ class LocalClient(object):
                 log.debug("Warmup ticket completed, WOULD REQUEST UPDATES HERE")
                 ticket.complete()
         elif ticket.type == TicketType.JOIN_SHARD:
-            print("\nA: {}".format(packet.shards))
             if not len(packet.shards):
                 return
-            
+
             log.info("Completed JOIN_SHARD request")
             shard = Shard.get(Shard.id == packet.shards[0].id)
             self.sync_shard(shard)
@@ -173,15 +176,6 @@ class LocalClient(object):
         """
         try:
             shard = Shard.get(Shard.id == id)
-
-            if shard.id not in self.shards or subscribe:
-                shard.active = True
-                self.shards[shard.id] = shard
-                self.shards[shard.id].chain = Chain(shard)
-            else:
-                log.warning("Shard {} already exists and is actively synced, skipping")
-
-            return shard
         except Shard.DoesNotExist:
             # We don't have this shard locally, so lets request it from the network
             ticket = self.add_ticket(Ticket(TicketType.JOIN_SHARD, shard_id=id, timeout=timeout))
@@ -195,6 +189,13 @@ class LocalClient(object):
 
             # Wait for the ticket to complete
             shard = ticket.wait()
+
+        # Make sure we start the mining process
+        if shard.id not in self.shards or subscribe:
+            shard.active = True
+            self.shards[shard.id] = shard
+            self.shards[shard.id].chain = Chain(shard)
+            self.shards[shard.id].chain.start_miner(self.user)
 
         # Optionally, subscribe to it
         if subscribe:
